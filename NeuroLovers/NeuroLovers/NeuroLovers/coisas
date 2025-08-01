@@ -1,0 +1,125 @@
+ * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #6e8efb, #a777e3);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      display: flex;
+      width: 90%;
+      max-width: 900px;
+      background-color: #fff;
+      border-radius: 20px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+    }
+
+    .login-container {
+      flex: 1;
+      padding: 40px;
+      background-color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .login-container h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #333;
+    }
+
+    .login-container input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 16px;
+    }
+
+    .login-container button {
+      width: 100%;
+      padding: 12px;
+      background-color: #6e8efb;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .login-container button:hover {
+      background-color: #5a75d2;
+    }
+
+    .error-message {
+      background-color: #f8d7da;
+      color: #721c24;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #f5c6cb;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .image-side {
+      flex: 1;
+      background-color: #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .image-side img {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      border-radius: 10px;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+      .image-side {
+        order: -1; /* mostra o gif antes do formulário em telas pequenas */
+      }
+    }
+  </style>
+</head>
+<body>
+    
+  <div class="container">
+    <!-- Formulário agora à esquerda -->
+    <form method="POST" class="login-container">
+      <h1>Login</h1>
+
+      <?php if (!empty($erro)): ?>
+        <div class="error-message"><?php echo $erro; ?></div>
+      <?php endif; ?>
+
+      <input type="text" name="user" placeholder="Usuário" required>
+      <input type="password" name="senha" placeholder="Senha" required>
+      <button type="submit">Entrar</button>
+    </form>
+
+    <!-- GIF agora à direita -->
+    <div class="image-side">
+      <img src="img/pixel-heart.gif" alt="Animação de boas-vindas">
+    </div>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,46 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Aplica a fonte Poppins ao corpo, caso não seja feito via Tailwind config ou default */
+body {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Estilo para o item de navegação ativo */
+.navigation ul li.active a {
+  color: #1da1f2; /* Cor azul de destaque */
+  background-color: rgba(29, 161, 242, 0.1); /* Fundo azul claro no active */
+}
+
+/* Estilo para a barra de rolagem customizada - isso não é feito diretamente com Tailwind */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #eef3f8; /* Cor do fundo da trilha da barra de rolagem */
+    border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1; /* Cor do "polegar" da barra de rolagem */
+    border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8; /* Cor do "polegar" no hover */
+}
+
+/* Garante que o input type="file" do formulário de postagem tenha o estilo aplicado no PHP */
+/* Embora a maior parte do estilo seja via Tailwind, alguns navegadores podem precisar de um empurrão */
+.post-form input[type="file"] {
+    cursor: pointer;
+}
+
+/* Limpa o float para garantir que o layout não seja quebrado pelo botão flutuante */
+.clear-both {
+    clear: both;
+}
