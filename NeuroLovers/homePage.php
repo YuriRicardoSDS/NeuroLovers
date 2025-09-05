@@ -20,16 +20,15 @@ if (!isset($_SESSION["usuario"])) {
 $userName = $_SESSION["usuario"];
 $userId = $_SESSION['usuario_id'];
 
-// --- NOVA FUNÇÃO: Redimensiona a imagem mantendo a proporção de forma segura ---
+// --- Função para Redimensionar e Otimizar Imagens ---
 function resizeImage($file, $maxWidth = 800, $maxHeight = 600) {
     $info = getimagesize($file);
     if ($info === false) {
-        return false; // Falha ao obter informações da imagem
+        return false;
     }
     list($originalWidth, $originalHeight) = $info;
     $mime = $info['mime'];
 
-    // Se a imagem já é menor que os limites, não faz nada
     if ($originalWidth <= $maxWidth && $originalHeight <= $maxHeight) {
         return true;
     }
@@ -50,7 +49,7 @@ function resizeImage($file, $maxWidth = 800, $maxHeight = 600) {
 
     $image_p = imagecreatetruecolor($newWidth, $newHeight);
     if ($image_p === false) {
-        return false; // Falha ao criar a nova imagem
+        return false;
     }
 
     $image = null;
@@ -60,7 +59,6 @@ function resizeImage($file, $maxWidth = 800, $maxHeight = 600) {
             break;
         case 'image/png':
             $image = imagecreatefrompng($file);
-            // Preserva a transparência do PNG
             imagealphablending($image_p, false);
             imagesavealpha($image_p, true);
             break;
@@ -71,20 +69,19 @@ function resizeImage($file, $maxWidth = 800, $maxHeight = 600) {
             $image = imagecreatefromwebp($file);
             break;
         default:
-            return false; // Tipo de imagem não suportado
+            return false;
     }
 
     if ($image === false) {
         imagedestroy($image_p);
-        return false; // Falha ao carregar a imagem original
+        return false;
     }
 
     imagecopyresampled($image_p, $image, 0, 0, 0, 0, $newWidth, $newHeight, $originalWidth, $originalHeight);
     
-    // Salva a imagem redimensionada
     switch ($mime) {
         case 'image/jpeg':
-            imagejpeg($image_p, $file, 85); // 85% de qualidade
+            imagejpeg($image_p, $file, 85);
             break;
         case 'image/png':
             imagepng($image_p, $file);
@@ -102,7 +99,7 @@ function resizeImage($file, $maxWidth = 800, $maxHeight = 600) {
     return true;
 }
 
-// --- Lida com o envio de uma nova postagem e a insere no banco de dados (via AJAX) ---
+// --- Lida com o envio de uma nova postagem via AJAX ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && (isset($_POST['post_text']) || isset($_FILES['post_image']))) {
     header('Content-Type: application/json');
     $response = ['success' => false, 'message' => '', 'new_post_html' => ''];
@@ -133,13 +130,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && (isset($_POST['post_text']) || isset
                 $targetFilePath = $uploadDir . $fileName;
 
                 if (move_uploaded_file($_FILES['post_image']['tmp_name'], $targetFilePath)) {
-                    // --- AQUI É ONDE A IMAGEM É REDIMENSIONADA ANTES DE SALVAR ---
-                    // Se o redimensionamento falhar, a postagem não é criada.
                     if (resizeImage($targetFilePath, 800, 600)) {
                          $postImage = $targetFilePath;
                     } else {
                         $response['message'] = "Erro ao redimensionar a imagem. Verifique se a biblioteca GD está instalada e tente uma imagem diferente.";
-                        unlink($targetFilePath); // Apaga a imagem não redimensionada
+                        unlink($targetFilePath);
                         echo json_encode($response);
                         exit;
                     }
@@ -176,8 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && (isset($_POST['post_text']) || isset
         if ($stmt_insert->execute()) {
             $newPostId = $conn->insert_id;
             
-            ob_start(); // Inicia o buffer para capturar o HTML
-            // Início do HTML da nova postagem
+            ob_start();
             ?>
             <div class="post-card mb-6" data-post-id="<?php echo $newPostId; ?>">
                 <div class="flex items-center justify-between mb-2">
@@ -219,7 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && (isset($_POST['post_text']) || isset
                 </div>
             </div>
             <?php
-            $response['new_post_html'] = ob_get_clean(); // Captura e limpa o buffer
+            $response['new_post_html'] = ob_get_clean();
 
             $response['success'] = true;
             $response['message'] = "Postagem criada com sucesso!";
@@ -235,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && (isset($_POST['post_text']) || isset
     exit;
 }
 
-// --- Lida com a criação de comentários (agora via AJAX) ---
+// --- Lida com a criação de comentários (via AJAX) ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['post_id']) && isset($_POST['comment_text'])) {
     header('Content-Type: application/json');
     $response = ['success' => false, 'message' => '', 'new_comment_html' => ''];
@@ -254,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['post_id']) && isset($_
         if ($stmt_comment->execute()) {
             $newCommentId = $conn->insert_id;
 
-            ob_start(); // Inicia o buffer para capturar o HTML do novo comentário
+            ob_start();
             ?>
             <div class="comment flex justify-between items-center" data-comment-id="<?php echo $newCommentId; ?>">
                 <div class="flex-grow">
@@ -279,6 +273,58 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['post_id']) && isset($_
         $response['message'] = "O comentário não pode ser vazio.";
     }
 
+    echo json_encode($response);
+    exit;
+}
+
+// --- Lida com a funcionalidade de curtir/descurtir via AJAX ---
+if (isset($_GET['action']) && $_GET['action'] == 'like' && isset($_GET['post_id'])) {
+    header('Content-Type: application/json');
+    $response = ['success' => false, 'message' => '', 'count' => 0, 'liked' => false];
+    $postId = (int)$_GET['post_id'];
+
+    if ($postId > 0) {
+        $stmt_check = $conn->prepare("SELECT id FROM curtidas WHERE id_postagem = ? AND id_usuario = ?");
+        $stmt_check->bind_param("ii", $postId, $userId);
+        $stmt_check->execute();
+        $result = $stmt_check->get_result();
+
+        if ($result->num_rows > 0) {
+            // Se já curtiu, descurte
+            $stmt_delete = $conn->prepare("DELETE FROM curtidas WHERE id_postagem = ? AND id_usuario = ?");
+            $stmt_delete->bind_param("ii", $postId, $userId);
+            if ($stmt_delete->execute()) {
+                $response['success'] = true;
+                $response['liked'] = false;
+            } else {
+                $response['message'] = "Erro ao descurtir a postagem.";
+            }
+            $stmt_delete->close();
+        } else {
+            // Se não curtiu, curte
+            $stmt_insert = $conn->prepare("INSERT INTO curtidas (id_postagem, id_usuario) VALUES (?, ?)");
+            $stmt_insert->bind_param("ii", $postId, $userId);
+            if ($stmt_insert->execute()) {
+                $response['success'] = true;
+                $response['liked'] = true;
+            } else {
+                $response['message'] = "Erro ao curtir a postagem.";
+            }
+            $stmt_insert->close();
+        }
+        $stmt_check->close();
+
+        // Obtém a contagem de curtidas atualizada
+        $stmt_count = $conn->prepare("SELECT COUNT(*) AS total_likes FROM curtidas WHERE id_postagem = ?");
+        $stmt_count->bind_param("i", $postId);
+        $stmt_count->execute();
+        $result_count = $stmt_count->get_result()->fetch_assoc();
+        $response['count'] = $result_count['total_likes'];
+        $stmt_count->close();
+    } else {
+        $response['message'] = "ID da postagem inválido.";
+    }
+    
     echo json_encode($response);
     exit;
 }
@@ -488,18 +534,18 @@ $pagina = $_GET['pagina'] ?? 'home';
             cursor: pointer;
         }
         .like-icon {
-            color: #4a5568; /* Cor padrão cinza */
+            color: #4a5568;
             transition: color 0.2s ease-in-out;
         }
         .like-icon:hover {
-            color: #4299e1; /* Cor azul ao passar o mouse */
+            color: #4299e1;
         }
         .like-icon.liked {
-            color: #ef4444 !important; /* Cor vermelha quando curtido, usando !important para garantir a prioridade */
+            color: #ef4444 !important;
         }
         .image-preview-container {
             margin-top: 0.5rem;
-            display: none; /* Ocultar por padrão */
+            display: none;
         }
         .image-preview {
             max-width: 100px;
@@ -737,7 +783,7 @@ $pagina = $_GET['pagina'] ?? 'home';
         
         // --- NOVA FUNÇÃO: Lida com a exclusão via AJAX ---
         async function deleteItemAJAX() {
-            hideDeleteConfirmation(); // Esconde o modal imediatamente
+            hideDeleteConfirmation();
             
             const deleteButton = document.getElementById('delete-modal-button');
             deleteButton.disabled = true;
@@ -757,7 +803,6 @@ $pagina = $_GET['pagina'] ?? 'home';
                 if (result.success) {
                     showMessage(result.message);
                     
-                    // Remove o elemento da página
                     if (itemToDeleteType === 'post') {
                         const postElement = document.querySelector(`.post-card[data-post-id="${itemToDeleteId}"]`);
                         if (postElement) {
@@ -767,7 +812,6 @@ $pagina = $_GET['pagina'] ?? 'home';
                         const commentElement = document.querySelector(`.comment[data-comment-id="${itemToDeleteId}"]`);
                         if (commentElement) {
                             commentElement.remove();
-                            // Verifica se é o último comentário e adiciona a mensagem "Nenhum comentário ainda"
                             const postCard = commentElement.closest('.post-card');
                             if (postCard) {
                                 const commentsList = postCard.querySelector('.comment-container > div');
@@ -793,6 +837,7 @@ $pagina = $_GET['pagina'] ?? 'home';
         }
 
 
+        // --- NOVA FUNÇÃO PARA CURTIR/DESCURTIR ---
         function toggleLike(postId) {
             fetch(`homePage.php?action=like&post_id=${postId}`)
                 .then(response => response.json())
@@ -841,7 +886,6 @@ $pagina = $_GET['pagina'] ?? 'home';
         const imagePreviewContainer = document.getElementById('image-preview-container');
         const imagePreview = document.getElementById('image-preview');
 
-        // Adiciona um listener para o campo de upload de arquivo
         postImageInput.addEventListener('change', function(event) {
             const file = event.target.files[0];
             if (file) {
