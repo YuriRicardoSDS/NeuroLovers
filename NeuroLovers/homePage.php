@@ -1,6 +1,11 @@
 <?php
 session_start();
 
+// Define o fuso horário para o de São Paulo (UTC-3)
+// Isso garante que todas as datas e horas manipuladas pelo PHP
+// sejam exibidas corretamente no seu fuso horário local.
+date_default_timezone_set('America/Sao_Paulo');
+
 include "conexao.php";
 
 if (!isset($conn) || $conn->connect_error) {
