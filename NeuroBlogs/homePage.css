@@ -1,239 +1,295 @@
+/* Estilos Gerais */
+
+/* Aplica a fonte Poppins ao corpo, caso não seja feito via Tailwind config ou default */
 body {
     font-family: 'Poppins', sans-serif;
-  }
-  
-  .navigation ul li button {
-      transition: all 0.3s ease;
-  }
-  
-  .navigation ul li button:hover {
-      transform: translateY(-2px);
-  }
-  
-  .navigation ul li.active button {
-      color: #1da1f2;
-      background-color: rgba(29, 161, 242, 0.1);
-  }
-  
-  .post-form input[type="file"] {
-      cursor: pointer;
-  }
-  
-  .clear-both {
-      clear: both;
-  }
-  
-  .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease, visibility 0.3s ease;
-  }
-  
-  .modal-overlay.show {
-      opacity: 1;
-      visibility: visible;
-  }
-  
-  .modal-content {
-      background-color: white;
-      padding: 2rem;
-      border-radius: 0.75rem;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-      max-width: 400px;
-      width: 90%;
-      text-align: center;
-      transform: translateY(-20px);
-      transition: transform 0.3s ease;
-  }
-  
-  .modal-overlay.show .modal-content {
-      transform: translateY(0);
-  }
-  
-  .message {
-      opacity: 1;
-      transition: opacity 0.5s ease-out;
-  }
-  
-  .message.hide {
-      opacity: 0;
-  }
-  
-  .logout-button {
-      margin-top: auto;
-      margin-bottom: 1.5rem;
-  }
-  
-  .logout-button button {
-      background-color: #fef2f2;
-      color: #ef4444;
-      font-weight: 600;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 4rem;
-      width: 11/12;
-      border-radius: 0.75rem;
-      transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
-      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-      border: none;
-      cursor: pointer;
-      padding: 0;
-  }
-  
-  .logout-button button:hover {
-      background-color: #fee2e2;
-      color: #dc2626;
-      transform: translateY(-2px);
-  }
-  
-  .logout-button i {
-      margin-right: 0.5rem;
-      font-size: 1.5rem;
-  }
-  
-  .logout-button span {
-      display: none;
-  }
-  
-  @media (min-width: 768px) {
-      .logout-button span {
-          display: inline;
-      }
-      .navigation {
-          width: 15rem;
-      }
-      .content-area {
-          margin-left: 15rem;
-      }
-  }
-  
-  .post-card {
-      background-color: white;
-      border-radius: 0.75rem;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-      padding: 1.5rem;
-  }
-  
-  .comment-container {
-      border-top: 1px solid #eef3f8;
-      padding-top: 1rem;
-      margin-top: 1rem;
-  }
-  
-  .comment {
-      margin-bottom: 0.5rem;
-      font-size: 0.875rem;
-      color: #4a5568;
-  }
-  
-  .comment .user-name {
-      font-weight: 600;
-      color: #2d3748;
-  }
-  
-  .comment-form {
-      display: flex;
-      gap: 0.5rem;
-  }
-  
-  .comment-form input[type="text"] {
-      flex-grow: 1;
-      padding: 0.5rem;
-      border-radius: 0.375rem;
-      border: 1px solid #cbd5e1;
-  }
-  
-  .comment-form button {
-      background-color: #4299e1;
-      color: white;
-      padding: 0.5rem 1rem;
-      border-radius: 0.375rem;
-      border: none;
-      cursor: pointer;
-  }
-  
-  .like-button {
-      cursor: pointer;
-  }
-  
-  .like-icon {
-      color: #4a5568;
-      transition: color 0.2s ease-in-out;
-  }
-  
-  .like-icon:hover {
-      color: #4299e1;
-  }
-  
-  .like-icon.liked {
-      color: #ef4444 !important;
-  }
-  
-  .image-preview-container {
-      margin-top: 0.5rem;
-      display: none;
-  }
-  
-  .image-preview {
-      max-width: 100px;
-      max-height: 100px;
-      object-fit: cover;
-      border-radius: 0.5rem;
-  }
-  
-  .post-form .post-button:disabled {
-      background-color: #94a3b8;
-      cursor: not-allowed;
-  }
-  
-  * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-  }
-  
-  /* Aplica a fonte Poppins ao corpo, caso não seja feito via Tailwind config ou default */
-  body {
-      font-family: 'Poppins', sans-serif;
-  }
-  
-  /* Estilo para o item de navegação ativo */
-  .navigation ul li.active a {
-      color: #1da1f2;
-      /* Cor azul de destaque */
-      background-color: rgba(29, 161, 242, 0.1);
-      /* Fundo azul claro no active */
-  }
-  
-  /* Estilo para a barra de rolagem customizada - isso não é feito diretamente com Tailwind */
-  .custom-scrollbar::-webkit-scrollbar {
-      width: 8px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-      background: #eef3f8;
-      /* Cor do fundo da trilha da barra de rolagem */
-      border-radius: 10px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      /* Cor da barra de rolagem */
-      border-radius: 10px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
-      /* Cor da barra de rolagem no hover */
-  }
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ---------------------------------------------------------------------- */
+/* 1. Navegação Lateral (Menu) */
+/* ---------------------------------------------------------------------- */
+
+.navigation {
+    /* w-20 bg-white rounded-r-xl shadow-lg flex flex-col pt-6 fixed top-0 left-0 h-screen z-10 */
+    width: 5rem; /* 80px */
+    background-color: white;
+    border-top-right-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    padding-top: 1.5rem;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 10;
+}
+
+.navigation ul li button {
+    transition: all 0.3s ease;
+}
+
+.navigation ul li button:hover {
+    transform: translateY(-2px);
+}
+
+.navigation ul li.active button {
+    color: #1da1f2;
+    background-color: rgba(29, 161, 242, 0.1);
+}
+
+.navigation ul li.logout-button {
+    margin-top: auto; /* Empurra para o final */
+    margin-bottom: 2rem;
+}
+
+.navigation ul li.logout-button button {
+    color: #ef4444; /* Cor vermelha para o logout */
+    font-size: 1.25rem;
+    padding: 0.5rem 0;
+}
+
+.navigation ul li.logout-button span {
+    display: none; /* Esconde texto na versão desktop (menu estreito) */
+}
+
+
+/* ---------------------------------------------------------------------- */
+/* 2. Conteúdo Principal e Scrollbar */
+/* ---------------------------------------------------------------------- */
+
+.content-area {
+    /* Estilos do Scrollbar (Compatível com Webkit) */
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+.content-area::-webkit-scrollbar {
+    width: 8px;
+}
+
+.content-area::-webkit-scrollbar-thumb {
+    background-color: #94a3b8;
+    border-radius: 10px;
+}
+
+.content-area::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+
+/* ---------------------------------------------------------------------- */
+/* 3. Estilos dos Cards (Posts e Formulário) */
+/* ---------------------------------------------------------------------- */
+
+.post-card {
+    /* Estilos base do card para posts e formulários */
+    /* bg-white p-6 rounded-xl shadow-lg border border-gray-100 transition duration-300 ease-in-out */
+    background-color: white;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    border: 1px solid #f3f4f6;
+    transition: all 0.3s ease-in-out;
+}
+
+.post-card:hover {
+    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.05);
+}
+
+.post-form textarea {
+    resize: vertical;
+}
+
+.post-form .post-button:disabled {
+    background-color: #94a3b8; /* Cor cinza/azul para desabilitado */
+    cursor: not-allowed;
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+/* Pré-visualização de imagem */
+.image-preview-container {
+    margin-top: 0.5rem;
+    display: none;
+}
+
+.image-preview {
+    max-width: 100px;
+    max-height: 100px;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    border: 1px solid #e2e8f0;
+}
+
+
+/* ---------------------------------------------------------------------- */
+/* 4. Estilos de Interação (Like/Comentário) */
+/* ---------------------------------------------------------------------- */
+
+.like-button {
+    cursor: pointer;
+    color: #64748b; /* Cor cinza padrão */
+    font-weight: 500;
+}
+
+.like-icon {
+    font-size: 1.1rem;
+    transition: color 0.3s ease;
+}
+
+.like-icon.liked,
+.like-button:hover .like-icon {
+    color: #ef4444 !important; /* Cor vermelha de "Apoio" */
+}
+
+.comment-container {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.comment {
+    background-color: #f8fafc;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    border: 1px solid #f0f4f8;
+}
+
+.comment .user-name {
+    font-weight: 600;
+    color: #1e3c72;
+    margin-right: 0.3rem;
+}
+
+.comment-form input[type="text"] {
+    width: calc(100% - 110px); /* Ajusta a largura para o botão (cerca de 100px) */
+    margin-right: 0.5rem;
+    height: 40px;
+}
+
+.comment-form {
+    display: flex;
+    align-items: center;
+}
+
+
+/* ---------------------------------------------------------------------- */
+/* 5. Modal de Confirmação */
+/* ---------------------------------------------------------------------- */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.modal-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background-color: #ffffff;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+    width: 90%;
+    max-width: 400px;
+    transform: scale(0.95);
+    transition: transform 0.3s ease;
+}
+
+.modal-overlay.show .modal-content {
+    transform: scale(1);
+}
+
+/* ---------------------------------------------------------------------- */
+/* 6. Estilos Refinados para o Painel de FILTROS AVANÇADOS */
+/* ---------------------------------------------------------------------- */
+
+.filter-panel {
+    /* Cor de fundo para dar destaque ao painel */
+    background-color: #ffffff;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.filter-panel h4 {
+    /* Estilo para o título principal do filtro */
+    color: #1e3c72; /* Azul escuro */
+    font-weight: 700;
+    border-bottom: 2px solid #1da1f2; /* Sublinhado azul de NeuroBlogs */
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.filter-panel h5 {
+    /* Estilo para os subtítulos (Formato, Análise, Sensibilidade) */
+    color: #1da1f2; /* Azul claro do tema */
+    font-weight: 600;
+    margin-bottom: 10px;
+    padding-left: 5px;
+    border-left: 3px solid #ffc107; /* Dourado como destaque */
+}
+
+/* Estilo para as opções de checkbox */
+.filter-panel label {
+    display: flex;
+    align-items: center;
+    padding: 4px 0;
+    transition: background-color 0.2s;
+    border-radius: 4px;
+    font-size: 0.95rem; /* Ajuste para melhor legibilidade */
+    color: #374151; /* Cor de texto mais escura */
+}
+
+.filter-panel label:hover {
+    background-color: #f0f4f8;
+}
+
+.filter-panel input[type="checkbox"] {
+    /* Customização do checkbox */
+    accent-color: #1da1f2;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-right: 0.5rem;
+    cursor: pointer;
+}
+
+/* Estilo para o botão de Aplicar Filtros */
+.filter-panel button {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.filter-panel .bg-blue-500 {
+    background-color: #1da1f2;
+}
+
+.filter-panel .hover\:bg-blue-600:hover {
+    background-color: #1e3c72;
+}
+
+/* Fim dos estilos do Painel de Filtros */

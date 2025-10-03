@@ -33,6 +33,7 @@ If ($_SERVER['REQUEST_METHOD'] == 'POST') {
   <title>Painel de Login</title> 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="login.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head> 
 <body>
@@ -40,7 +41,7 @@ If ($_SERVER['REQUEST_METHOD'] == 'POST') {
   <div class="card p-4 shadow-lg" style="width: 100%; max-width: 420px;">
     <h2 class="text-center">Login</h2> 
     <?php if ($erro): ?> 
-      <div class="erro"><?php echo $erro; ?></div> 
+      <div class="alert alert-danger" role="alert"><?php echo $erro; ?></div> 
     <?php endif; ?>
     <form method="POST"> 
       <div class="mb-3 input-group">
@@ -50,16 +51,36 @@ If ($_SERVER['REQUEST_METHOD'] == 'POST') {
       <div class="mb-3 input-group">
         <span class="input-group-text bg-light"><i data-lucide="lock"></i></span>
         <input type="password" placeholder="Senha" name="senha" id="senha" class="form-control" required/>
+        <button type="button" class="btn btn-outline-secondary" id="togglePassword">
+            <i class="fa-solid fa-eye" id="eyeIcon"></i>
+        </button>
       </div> 
-      <button type="submit" class="btn btn-primary w-100 mb-3">Entrar</button> 
-      <div class="text-center"> 
-        <a href="#" class="btn-link">Esqueceu a senha?</a> 
-      </div> 
+      <button type="submit" class="btn btn-primary w-100">Entrar</button> 
     </form> 
-  </div> 
+    <div class="text-center mt-3">
+        <p>Não tem conta? <a href="registrar.php" class="text-decoration-none">Cadastre-se aqui</a></p>
+    </div>
+  </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+  // Inicializa os ícones do Lucide
   lucide.createIcons();
-</script> 
-</body> 
+  
+  // Script para alternar a visibilidade da senha
+  const togglePassword = document.getElementById('togglePassword');
+  const passwordInput = document.getElementById('senha');
+  const eyeIcon = document.getElementById('eyeIcon');
+  
+  togglePassword.addEventListener('click', function() {
+      // Alterna entre 'password' e 'text'
+      const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+      passwordInput.setAttribute('type', type);
+      
+      // Alterna o ícone
+      eyeIcon.classList.toggle('fa-eye');
+      eyeIcon.classList.toggle('fa-eye-slash');
+  });
+</script>
+</body>
 </html>

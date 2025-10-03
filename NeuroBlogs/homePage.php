@@ -2,14 +2,12 @@
 session_start();
 
 // Define o fuso horário para o de São Paulo (UTC-3)
-// Isso garante que todas as datas e horas manipuladas pelo PHP
-// sejam exibidas corretamente no seu fuso horário local.
 date_default_timezone_set('America/Sao_Paulo');
 
 include "conexao.php";
 
 if (!isset($conn) || $conn->connect_error) {
-    die("Erro fatal: A conexão com o banco de dados não pôde ser estabelecida. Verifique o arquivo 'conexao.php' e as credenciais. Erro: " . (isset($conn) ? $conn->connect_error : 'Variável $conn não definida.'));
+    die("Erro fatal: A conexão com o banco de dados não pôde ser estabelecida. Verifique o arquivo 'conexao.php' e as credenciais. Erro: " . (isset($conn) ? $conn->connect_error : 'Variável \$conn não definida.'));
 }
 
 // Verifica se a extensão GD está instalada e ativada
@@ -119,6 +117,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && (isset($_POST['post_text']) || isset
     }
 
     $postText = trim($_POST['post_text'] ?? '');
+    $tipoAnalise = $_POST['post_analise'] ?? 'analise-aprofundada'; // Novo campo
+    $avisoSensibilidade = $_POST['post_sensibilidade'] ?? 'sem-spoiler'; // Novo campo
     $postImage = null;
 
     if (isset($_FILES['post_image']) && $_FILES['post_image']['error'] !== UPLOAD_ERR_NO_FILE) {
@@ -159,20 +159,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && (isset($_POST['post_text']) || isset
         }
     }
 
+    // Define o formato automaticamente baseado na presença de imagem
+    $postFormato = !empty($postImage) ? 'texto-imagem' : 'somente-texto';
+    if (strpos(strtolower($postText), 'youtube') !== false || strpos(strtolower($postText), 'video') !== false) {
+        $postFormato = 'video-curto'; // Prioriza como vídeo se a palavra-chave estiver no texto
+    }
+
+
     if (!empty($postText) || !empty($postImage)) {
-        $stmt_insert = $conn->prepare("INSERT INTO postagens (usuario_id, conteudo, imagem) VALUES (?, ?, ?)");
+        // Prepare a query para incluir as novas colunas
+        $stmt_insert = $conn->prepare("INSERT INTO postagens (usuario_id, conteudo, imagem, formato, tipo_analise, aviso_sensibilidade) VALUES (?, ?, ?, ?, ?, ?)");
         if ($stmt_insert === false) {
              echo json_encode($response);
              exit;
         }
-        $stmt_insert->bind_param("iss", $userId, $postText, $postImage);
+        // Bind parameters
+        $stmt_insert->bind_param("isssss", $userId, $postText, $postImage, $postFormato, $tipoAnalise, $avisoSensibilidade);
         
         if ($stmt_insert->execute()) {
             $newPostId = $conn->insert_id;
             
             ob_start();
             ?>
-            <div class="post-card mb-6" data-post-id="<?php echo $newPostId; ?>">
+            <div class="post-card mb-6" data-post-id="<?php echo $newPostId; ?>" 
+                 data-formato="<?php echo $postFormato; ?>"
+                 data-analise="<?php echo $tipoAnalise; ?>" 
+                 data-sensibilidade="<?php echo $avisoSensibilidade; ?>">
                 <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center">
                         <i class="fa-solid fa-user-circle text-2xl text-gray-500 mr-2"></i>
@@ -251,9 +263,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['post_id']) && isset($_
                     <?php echo htmlspecialchars($comment_text); ?>
                     <p class="text-xs text-gray-400"><?php echo date("d/m/Y", strtotime('now')); ?></p>
                 </div>
-                <button type="button" onclick="showDeleteConfirmation('comment', <?php echo $newCommentId; ?>);" class="text-gray-400 hover:text-red-500 transition-colors duration-200 ml-2" title="Excluir comentário">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
+                <?php // O botão de exclusão é exibido porque o usuário atual é o autor do comentário recém-criado. ?>
+                    <button type="button" onclick="showDeleteConfirmation('comment', <?php echo $newCommentId; ?>);" class="text-gray-400 hover:text-red-500 transition-colors duration-200 ml-2" title="Excluir comentário">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
             </div>
             <?php
             $response['new_comment_html'] = ob_get_clean();
@@ -432,122 +445,211 @@ $pagina = $_GET['pagina'] ?? 'home';
         } elseif ($pagina == 'posts') {
             echo '<h2 class="text-3xl font-bold text-[#1da1f2] mb-4">Posts</h2>';
             ?>
-            <div class="post-card mb-6">
-                <form id="post-form" action="homePage.php" method="POST" enctype="multipart/form-data">
-                    <div class="post-form">
-                        <textarea name="post_text" placeholder="O que você está pensando, <?php echo htmlspecialchars($userName); ?>?" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 mb-3" rows="3"></textarea>
-                        <div class="flex flex-col">
-                            <div class="flex items-center gap-2">
-                                <label for="post_image" class="cursor-pointer text-gray-500 hover:text-blue-500 transition-colors duration-200" title="Fazer upload de imagem">
-                                    <i class="fa-solid fa-image text-2xl"></i>
+            <div class="flex flex-col lg:flex-row gap-8">
+                
+                <div class="lg:w-1/4">
+                    <div class="filter-panel bg-white p-4 rounded-xl shadow-lg sticky top-8">
+                        <h4 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2"><i class="fa-solid fa-filter mr-2"></i> Filtros Avançados</h4>
+                        
+                        <div class="mb-5">
+                            <h5 class="text-md font-semibold text-blue-500 mb-2">Formato de Conteúdo</h5>
+                            <div class="space-y-1">
+                                <label class="flex items-center text-sm text-gray-600 cursor-pointer hover:text-gray-800 transition-colors">
+                                    <input class="formato-filter mr-2" type="checkbox" value="somente-texto"> Somente Texto
                                 </label>
-                                <input type="file" id="post_image" name="post_image" class="hidden" accept="image/*">
-                            </div>
-                            <div id="image-preview-container" class="image-preview-container mb-2">
-                                <img id="image-preview" src="#" alt="Pré-visualização da imagem" class="image-preview">
-                            </div>
-                            <div class="flex justify-end items-center">
-                                <button type="submit" name="submit_post" id="post-button" class="post-button bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-full transition-colors duration-200">Postar</button>
+                                <label class="flex items-center text-sm text-gray-600 cursor-pointer hover:text-gray-800 transition-colors">
+                                    <input class="formato-filter mr-2" type="checkbox" value="texto-imagem"> Texto e Imagem
+                                </label>
+                                <label class="flex items-center text-sm text-gray-600 cursor-pointer hover:text-gray-800 transition-colors">
+                                    <input class="formato-filter mr-2" type="checkbox" value="video-curto"> Vídeo Curto
+                                </label>
                             </div>
                         </div>
-                    </div>
-                </form>
-            </div>
-            
-            <div id="posts-container">
-            <?php
-            $sql_posts = "SELECT p.*, u.nome AS autor_nome, 
-                                 (SELECT COUNT(*) FROM curtidas WHERE id_postagem = p.id) AS total_curtidas,
-                                 (SELECT COUNT(*) FROM curtidas WHERE id_postagem = p.id AND id_usuario = ?) AS curtiu_usuario
-                              FROM postagens p 
-                              JOIN usuarios u ON p.usuario_id = u.id 
-                              ORDER BY p.data_criacao DESC";
-            $stmt_posts = $conn->prepare($sql_posts);
-            $stmt_posts->bind_param("i", $userId);
-            $stmt_posts->execute();
-            $result_posts = $stmt_posts->get_result();
 
-            if ($result_posts->num_rows > 0) {
-                while ($post = $result_posts->fetch_assoc()) {
-                    ?>
-                    <div class="post-card mb-6" data-post-id="<?php echo $post['id']; ?>">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="flex items-center">
-                                <i class="fa-solid fa-user-circle text-2xl text-gray-500 mr-2"></i>
-                                <div>
-                                    <p class="font-semibold text-gray-800"><?php echo htmlspecialchars($post['autor_nome']); ?></p>
-                                    <p class="text-sm text-gray-500"><?php echo date("d/m/Y H:i", strtotime($post['data_criacao'])); ?></p>
+                        <div class="mb-5">
+                            <h5 class="text-md font-semibold text-blue-500 mb-2">Tipo de Análise</h5>
+                            <div class="space-y-1">
+                                <label class="flex items-center text-sm text-gray-600 cursor-pointer hover:text-gray-800 transition-colors">
+                                    <input class="analise-filter mr-2" type="checkbox" value="detalhes-tecnicos"> Detalhes Técnicos
+                                </label>
+                                <label class="flex items-center text-sm text-gray-600 cursor-pointer hover:text-gray-800 transition-colors">
+                                    <input class="analise-filter mr-2" type="checkbox" value="resumo-rapido"> Resumos Rápidos
+                                </label>
+                                <label class="flex items-center text-sm text-gray-600 cursor-pointer hover:text-gray-800 transition-colors">
+                                    <input class="analise-filter mr-2" type="checkbox" value="analise-aprofundada"> Análises Aprofundadas
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-5">
+                            <h5 class="text-md font-semibold text-blue-500 mb-2">Avisos de Sensibilidade</h5>
+                            <div class="space-y-1">
+                                <label class="flex items-center text-sm text-gray-600 cursor-pointer hover:text-gray-800 transition-colors">
+                                    <input class="sensibilidade-filter mr-2" type="checkbox" value="sem-spoiler"> Sem Spoilers
+                                </label>
+                                <label class="flex items-center text-sm text-gray-600 cursor-pointer hover:text-gray-800 transition-colors">
+                                    <input class="sensibilidade-filter mr-2" type="checkbox" value="alerta-luzes"> Alerta: Luzes Piscando
+                                </label>
+                                <label class="flex items-center text-sm text-gray-600 cursor-pointer hover:text-gray-800 transition-colors">
+                                    <input class="sensibilidade-filter mr-2" type="checkbox" value="conteudo-sensivel"> Conteúdo Sensível
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button onclick="aplicarFiltros()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg transition-colors duration-200 mt-2">Aplicar Filtros</button>
+                    </div>
+                </div>
+
+                <div class="lg:w-3/4">
+                    
+                    <div class="post-card mb-6">
+                        <form id="post-form" action="homePage.php" method="POST" enctype="multipart/form-data">
+                            <div class="post-form">
+                                <textarea name="post_text" placeholder="O que você está pensando, <?php echo htmlspecialchars($userName); ?>? (Marque abaixo o tipo de postagem)" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 mb-3" rows="3"></textarea>
+                                
+                                <div class="flex flex-col sm:flex-row gap-4 mb-3">
+                                    <div class="w-full sm:w-1/2">
+                                        <label for="post_analise" class="block text-sm font-medium text-gray-700 mb-1">Tipo de Análise:</label>
+                                        <select id="post_analise" name="post_analise" class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                            <option value="analise-aprofundada">Análise Aprofundada</option>
+                                            <option value="resumo-rapido">Resumo Rápido</option>
+                                            <option value="detalhes-tecnicos">Detalhes Técnicos</option>
+                                        </select>
+                                    </div>
+                                    <div class="w-full sm:w-1/2">
+                                        <label for="post_sensibilidade" class="block text-sm font-medium text-gray-700 mb-1">Aviso de Sensibilidade:</label>
+                                        <select id="post_sensibilidade" name="post_sensibilidade" class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                            <option value="sem-spoiler">Sem Spoilers</option>
+                                            <option value="alerta-luzes">Alerta: Luzes Piscando</option>
+                                            <option value="conteudo-sensivel">Conteúdo Sensível</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex flex-col">
+                                    <div class="flex items-center gap-2">
+                                        <label for="post_image" class="cursor-pointer text-gray-500 hover:text-blue-500 transition-colors duration-200" title="Fazer upload de imagem">
+                                            <i class="fa-solid fa-image text-2xl"></i>
+                                        </label>
+                                        <input type="file" id="post_image" name="post_image" class="hidden" accept="image/*">
+                                    </div>
+                                    <div id="image-preview-container" class="image-preview-container mb-2">
+                                        <img id="image-preview" src="#" alt="Pré-visualização da imagem" class="image-preview">
+                                    </div>
+                                    <div class="flex justify-end items-center">
+                                        <button type="submit" name="submit_post" id="post-button" class="post-button bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-full transition-colors duration-200">Postar</button>
+                                    </div>
                                 </div>
                             </div>
-                            <?php if ($post['usuario_id'] == $userId): ?>
-                                <button type="button" onclick="showDeleteConfirmation('post', <?php echo $post['id']; ?>);" class="text-gray-500 hover:text-red-500 transition-colors duration-200" title="Excluir postagem">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            <?php endif; ?>
-                        </div>
-                        <?php if (!empty($post['conteudo'])): ?>
-                            <p class="text-gray-700 mb-3"><?php echo htmlspecialchars($post['conteudo']); ?></p>
-                        <?php endif; ?>
-                        <?php if (!empty($post['imagem'])): ?>
-                            <div class="my-3">
-                                <img src="<?php echo htmlspecialchars($post['imagem']); ?>" alt="Imagem da postagem" class="rounded-lg max-w-full h-auto">
-                            </div>
-                        <?php endif; ?>
-                        
-                        <div class="flex items-center gap-4 mt-3 pt-3 border-t border-gray-200">
-                            <span onclick="toggleLike(<?php echo $post['id']; ?>)" class="flex items-center transition-colors duration-200 like-button">
-                                <i id="like-icon-<?php echo $post['id']; ?>" class="fa-solid fa-heart mr-1 like-icon <?php echo $post['curtiu_usuario'] > 0 ? 'liked' : ''; ?>"></i>
-                                <span id="like-count-<?php echo $post['id']; ?>"><?php echo $post['total_curtidas']; ?></span>
-                            </span>
-                        </div>
-
-                        <div class="comment-container">
-                            <h6 class="font-semibold text-gray-700 mb-2">Comentários</h6>
-                            <div id="comments-list-<?php echo $post['id']; ?>">
-                                <?php
-                                $sql_comments = "SELECT c.*, u.nome AS autor_comentario_nome FROM comentarios c JOIN usuarios u ON c.id_usuario = u.id WHERE c.id_postagem = ? ORDER BY c.data_criacao ASC";
-                                $stmt_comments = $conn->prepare($sql_comments);
-                                $stmt_comments->bind_param("i", $post['id']);
-                                $stmt_comments->execute();
-                                $result_comments = $stmt_comments->get_result();
-
-                                if ($result_comments->num_rows > 0) {
-                                    while ($comment = $result_comments->fetch_assoc()) {
-                                        ?>
-                                        <div class="comment flex justify-between items-center" data-comment-id="<?php echo $comment['id']; ?>">
-                                            <div class="flex-grow">
-                                                <span class="user-name"><?php echo htmlspecialchars($comment['autor_comentario_nome']); ?>:</span>
-                                                <?php echo htmlspecialchars($comment['conteudo']); ?>
-                                                <p class="text-xs text-gray-400"><?php echo date("d/m/Y", strtotime($comment['data_criacao'])); ?></p>
-                                            </div>
-                                            <?php if ($comment['id_usuario'] == $userId): ?>
-                                                <button type="button" onclick="showDeleteConfirmation('comment', <?php echo $comment['id']; ?>);" class="text-gray-400 hover:text-red-500 transition-colors duration-200 ml-2" title="Excluir comentário">
-                                                    <i class="fa-solid fa-trash"></i>
-                                                </button>
-                                            <?php endif; ?>
-                                        </div>
-                                        <?php
-                                    }
-                                    $stmt_comments->close();
-                                } else {
-                                    echo '<p id="no-comments-message-'.$post['id'].'" class="text-sm text-gray-500">Nenhum comentário ainda.</p>';
-                                }
-                                ?>
-                            </div>
-                            <form class="comment-form mt-3" data-post-id="<?php echo $post['id']; ?>">
-                                <input type="hidden" name="post_id" value="<?php echo $post['id']; ?>">
-                                <input type="text" name="comment_text" placeholder="Adicionar um comentário..." required class="border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">Comentar</button>
-                            </form>
-                        </div>
+                        </form>
                     </div>
+                    
+                    <div id="posts-container">
                     <?php
-                }
-            } else {
-                echo '<p class="text-gray-500 text-center">Nenhuma postagem encontrada.</p>';
-            }
-            $stmt_posts->close();
-            ?>
+                    // ATUALIZAÇÃO: Adicionadas as novas colunas à query de seleção
+                    $sql_posts = "SELECT p.*, u.nome AS autor_nome, p.formato, p.tipo_analise, p.aviso_sensibilidade,
+                                        (SELECT COUNT(*) FROM curtidas WHERE id_postagem = p.id) AS total_curtidas,
+                                        (SELECT COUNT(*) FROM curtidas WHERE id_postagem = p.id AND id_usuario = ?) AS curtiu_usuario
+                                    FROM postagens p 
+                                    JOIN usuarios u ON p.usuario_id = u.id 
+                                    ORDER BY p.data_criacao DESC";
+                    $stmt_posts = $conn->prepare($sql_posts);
+                    $stmt_posts->bind_param("i", $userId);
+                    $stmt_posts->execute();
+                    $result_posts = $stmt_posts->get_result();
+
+                    if ($result_posts->num_rows > 0) {
+                        while ($post = $result_posts->fetch_assoc()) {
+                            // REMOÇÃO: As variáveis simuladas foram removidas. Os dados são lidos do banco.
+                            $postFormato = $post['formato'];
+                            $postAnalise = $post['tipo_analise'];
+                            $postSensibilidade = $post['aviso_sensibilidade'];
+                            
+                            ?>
+                            <div class="post-card mb-6" 
+                                data-post-id="<?php echo $post['id']; ?>"
+                                data-formato="<?php echo $postFormato; ?>"
+                                data-analise="<?php echo $postAnalise; ?>"
+                                data-sensibilidade="<?php echo $postSensibilidade; ?>">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex items-center">
+                                        <i class="fa-solid fa-user-circle text-2xl text-gray-500 mr-2"></i>
+                                        <div>
+                                            <p class="font-semibold text-gray-800"><?php echo htmlspecialchars($post['autor_nome']); ?></p>
+                                            <p class="text-sm text-gray-500"><?php echo date("d/m/Y H:i", strtotime($post['data_criacao'])); ?></p>
+                                        </div>
+                                    </div>
+                                    <?php if ($post['usuario_id'] == $userId): ?>
+                                        <button type="button" onclick="showDeleteConfirmation('post', <?php echo $post['id']; ?>);" class="text-gray-500 hover:text-red-500 transition-colors duration-200" title="Excluir postagem">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if (!empty($post['conteudo'])): ?>
+                                    <p class="text-gray-700 mb-3"><?php echo htmlspecialchars($post['conteudo']); ?></p>
+                                <?php endif; ?>
+                                <?php if (!empty($post['imagem'])): ?>
+                                    <div class="my-3">
+                                        <img src="<?php echo htmlspecialchars($post['imagem']); ?>" alt="Imagem da postagem" class="rounded-lg max-w-full h-auto">
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <div class="flex items-center gap-4 mt-3 pt-3 border-t border-gray-200">
+                                    <span onclick="toggleLike(<?php echo $post['id']; ?>)" class="flex items-center transition-colors duration-200 like-button">
+                                        <i id="like-icon-<?php echo $post['id']; ?>" class="fa-solid fa-heart mr-1 like-icon <?php echo $post['curtiu_usuario'] > 0 ? 'liked' : ''; ?>"></i>
+                                        <span id="like-count-<?php echo $post['id']; ?>"><?php echo $post['total_curtidas']; ?></span>
+                                    </span>
+                                </div>
+
+                                <div class="comment-container">
+                                    <h6 class="font-semibold text-gray-700 mb-2">Comentários</h6>
+                                    <div id="comments-list-<?php echo $post['id']; ?>">
+                                        <?php
+                                        $sql_comments = "SELECT c.*, u.nome AS autor_comentario_nome FROM comentarios c JOIN usuarios u ON c.id_usuario = u.id WHERE c.id_postagem = ? ORDER BY c.data_criacao ASC";
+                                        $stmt_comments = $conn->prepare($sql_comments);
+                                        $stmt_comments->bind_param("i", $post['id']);
+                                        $stmt_comments->execute();
+                                        $result_comments = $stmt_comments->get_result();
+
+                                        if ($result_comments->num_rows > 0) {
+                                            while ($comment = $result_comments->fetch_assoc()) {
+                                                ?>
+                                                <div class="comment flex justify-between items-center" data-comment-id="<?php echo $comment['id']; ?>">
+                                                    <div class="flex-grow">
+                                                        <span class="user-name"><?php echo htmlspecialchars($comment['autor_comentario_nome']); ?>:</span>
+                                                        <?php echo htmlspecialchars($comment['conteudo']); ?>
+                                                        <p class="text-xs text-gray-400"><?php echo date("d/m/Y", strtotime($comment['data_criacao'])); ?></p>
+                                                    </div>
+                                                    <?php if ($comment['id_usuario'] == $userId): ?>
+                                                        <button type="button" onclick="showDeleteConfirmation('comment', <?php echo $comment['id']; ?>);" class="text-gray-400 hover:text-red-500 transition-colors duration-200 ml-2" title="Excluir comentário">
+                                                            <i class="fa-solid fa-trash"></i>
+                                                        </button>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <?php
+                                            }
+                                            $stmt_comments->close();
+                                        } else {
+                                            echo '<p id="no-comments-message-'.$post['id'].'" class="text-sm text-gray-500">Nenhum comentário ainda.</p>';
+                                        }
+                                        ?>
+                                    </div>
+                                    <form class="comment-form mt-3" data-post-id="<?php echo $post['id']; ?>">
+                                        <input type="hidden" name="post_id" value="<?php echo $post['id']; ?>">
+                                        <input type="text" name="comment_text" placeholder="Adicionar um comentário..." required class="border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">Comentar</button>
+                                    </form>
+                                </div>
+                            </div>
+                            <?php
+                        }
+                    } else {
+                        echo '<p class="text-gray-500 text-center">Nenhuma postagem encontrada.</p>';
+                    }
+                    $stmt_posts->close();
+                    ?>
+                    </div>
+                </div>
             </div>
         <?php } elseif ($pagina == 'profile') { ?>
             <h2 class="text-3xl font-bold text-[#1da1f2] mb-4">Perfil</h2>
@@ -807,7 +909,6 @@ $pagina = $_GET['pagina'] ?? 'home';
                     if (newCommentForm) {
                         attachCommentFormListener(newCommentForm);
                     }
-
                 }
             } catch (error) {
                 console.error('Erro:', error);
@@ -823,7 +924,53 @@ $pagina = $_GET['pagina'] ?? 'home';
             commentForms.forEach(form => {
                 attachCommentFormListener(form);
             });
+            // Apenas executa a filtragem inicial, mas NÃO adiciona listener de 'change'
+            aplicarFiltros(); 
         });
+
+        // --- Implementação da Lógica de Filtros Avançados (JavaScript) ---
+        function aplicarFiltros() {
+            const posts = document.querySelectorAll('#posts-container .post-card');
+
+            // 1. Coleta os filtros selecionados, agrupados por categoria
+            const formatoFilters = Array.from(document.querySelectorAll('.formato-filter:checked')).map(cb => cb.value);
+            const analiseFilters = Array.from(document.querySelectorAll('.analise-filter:checked')).map(cb => cb.value);
+            const sensibilidadeFilters = Array.from(document.querySelectorAll('.sensibilidade-filter:checked')).map(cb => cb.value);
+
+            posts.forEach(post => {
+                const postFormato = post.getAttribute('data-formato');
+                const postAnalise = post.getAttribute('data-analise');
+                const postSensibilidade = post.getAttribute('data-sensibilidade');
+
+                let passesFormato = true;
+                let passesAnalise = true;
+                let passesSensibilidade = true;
+
+                // Lógica de Filtragem: O post deve satisfazer TODOS os grupos de filtros que estão ativos (AND LÓGICO).
+
+                // A. Verifica o grupo Formato
+                if (formatoFilters.length > 0) {
+                    passesFormato = formatoFilters.includes(postFormato);
+                }
+
+                // B. Verifica o grupo Tipo de Análise
+                if (analiseFilters.length > 0) {
+                    passesAnalise = analiseFilters.includes(postAnalise);
+                }
+
+                // C. Verifica o grupo Sensibilidade
+                if (sensibilidadeFilters.length > 0) {
+                    passesSensibilidade = sensibilidadeFilters.includes(postSensibilidade);
+                }
+
+                // Resultado Final: O post só é visível se passar em TODOS os filtros ativos (AND LÓGICO)
+                if (passesFormato && passesAnalise && passesSensibilidade) {
+                    post.style.display = 'block'; // Mostra o post
+                } else {
+                    post.style.display = 'none'; // Esconde o post
+                }
+            });
+        }
     </script>
 </body>
 </html>
