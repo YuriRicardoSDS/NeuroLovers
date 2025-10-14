@@ -50,15 +50,28 @@ body {
     margin-bottom: 2rem;
 }
 
+/* ESTILOS ATUALIZADOS DO BOTÃO DE SAIR (LOGOUT) */
 .navigation ul li.logout-button button {
-    color: #ef4444; /* Cor vermelha para o logout */
-    font-size: 1.25rem;
+    /* Estilo de base para o botão de sair */
+    transition: all 0.3s ease;
     padding: 0.5rem 0;
 }
 
-.navigation ul li.logout-button span {
-    display: none; /* Esconde texto na versão desktop (menu estreito) */
+.navigation ul li.logout-button i {
+    /* Garante que o ícone de sair é grande */
+    font-size: 1.875rem; /* 30px, correspondente ao text-3xl do Tailwind */
 }
+
+.navigation ul li.logout-button span {
+    display: block; /* Garante que o texto está visível */
+    
+    /* MODIFIQUE ESTA LINHA: Aumente o valor para uma fonte maior */
+    font-size: 0.9rem; /* Aumentado para 0.8rem (aprox. 12.8px) */
+    
+    font-weight: 600;
+    color: #374151; /* Cor de texto padrão para legibilidade */
+}
+/* FIM DOS ESTILOS ATUALIZADOS DO BOTÃO DE SAIR (LOGOUT) */
 
 
 /* ---------------------------------------------------------------------- */
@@ -292,4 +305,90 @@ body {
     background-color: #1e3c72;
 }
 
+
+/* ESTILOS DE RESPONSIVIDADE PARA O PAINEL DE FILTROS */
+
+/* 1. Comportamento para telas menores (mobile/tablet) */
+.filter-panel-wrapper.active {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.filter-panel-wrapper.active .filter-panel {
+    max-height: 90vh;
+    overflow-y: auto;
+    width: 100%;
+    max-width: 500px;
+    box-shadow: 0 0 25px rgba(0, 0, 0, 0.5);
+    position: relative; /* Para o botão de fechar */
+}
+
+/* Mostrar o botão de fechar apenas quando o overlay estiver ativo */
+.filter-panel-wrapper.active #close-filter-btn {
+    display: block !important;
+}
+
+/* Esconder o painel em mobile por padrão */
+@media (max-width: 1023px) {
+    /* Oculta a wrapper do painel de filtro por padrão em mobile, só mostra com .active */
+    .filter-panel-wrapper {
+        display: none;
+    }
+    .filter-panel-wrapper.active {
+        display: flex;
+    }
+    /* Em mobile a coluna de filtros ocupa 100% da largura, mas só fica visível no overlay */
+    .filter-col {
+        width: 100% !important; 
+    }
+    /* Em mobile a coluna de posts ocupa 100% da largura */
+    .posts-col {
+        width: 100% !important; 
+    }
+}
+
+/* 2. Comportamento para telas maiores (desktop - lg e acima) */
+@media (min-width: 1024px) {
+    /* Garante que o painel está visível por padrão em desktop */
+    .filter-panel-wrapper {
+        display: block;
+    }
+    /* Oculta o botão mobile em desktop */
+    #toggle-filter-mobile-btn {
+        display: none;
+    }
+    
+    /* Classes que controlam a visibilidade/largura em desktop (via JavaScript) */
+    .filter-col {
+        transition: width 0.3s ease, opacity 0.3s ease;
+        width: 25%; /* Lg:w-1/4 */
+    }
+    
+    /* Classe para ocultar a coluna do filtro e o painel em desktop */
+    .filter-col.hidden-lg {
+        width: 0 !important;
+        opacity: 0;
+        pointer-events: none; /* Impede clique */
+        overflow: hidden; /* Remove o painel da view */
+    }
+    
+    .posts-col {
+        transition: width 0.3s ease;
+        width: 75%; /* Lg:w-3/4 */
+    }
+    
+    /* Quando o painel de filtros está oculto, a coluna de posts ocupa toda a largura */
+    .posts-col-full-width {
+        width: 100% !important;
+    }
+}
 /* Fim dos estilos do Painel de Filtros */

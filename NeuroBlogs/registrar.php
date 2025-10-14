@@ -6,106 +6,127 @@ $erro_mensagem_login = "";
 $erro_mensagem_senha = "";
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST'){
-    $nome = $_POST['nome'];
-    $login = $_POST['user'];
+    // ALTERADO: $nome para $apelido e $_POST['nome'] para $_POST['apelido']
+    $apelido = $_POST['apelido']; 
+    // CORREÇÃO 1: TROCANDO 'user' POR 'email'
+    $login = $_POST['email']; 
     $senha_plain = $_POST['senha'];
     $confirmacao_plain = $_POST['confirmacao'];
 
     if($senha_plain == $confirmacao_plain){
-        // Verifica se o usuário já existe
-        $sql_verificar_usuario = "SELECT id FROM usuarios WHERE user = ?";
+        // Verifica se o email já existe
+        // CORREÇÃO 2: TROCANDO 'user' POR 'email' NA CONSULTA
+        $sql_verificar_usuario = "SELECT id FROM usuarios WHERE email = ?";
         $stmt_verificar = mysqli_prepare($conn, $sql_verificar_usuario);
         mysqli_stmt_bind_param($stmt_verificar, "s", $login);
         mysqli_stmt_execute($stmt_verificar);
         mysqli_stmt_store_result($stmt_verificar);
 
         if(mysqli_stmt_num_rows($stmt_verificar) > 0){
-            // Se o usuário já existe, define a mensagem de erro para o campo de login
-            $erro_mensagem_login = "Já existe um usuário com esse nome!";
+            // Se o email já existe, define a mensagem de erro para o campo de email
+            $erro_mensagem_login = "Já existe um usuário com esse E-mail!";
         } else {
-            // Se o usuário não existe, criptografa a senha e insere no banco
+            // Se o email não existe, criptografa a senha e insere no banco
             $senha = password_hash($senha_plain, PASSWORD_DEFAULT);
-            $sql_inserir_usuario = "INSERT INTO usuarios (nome, user, senha) VALUES (?, ?, ?)";
+            // ALTERADO: Coluna 'nome' para 'apelido' na query SQL
+            $sql_inserir_usuario = "INSERT INTO usuarios (apelido, email, senha, nivel) VALUES (?, ?, ?, 0)"; 
             $stmt_inserir = mysqli_prepare($conn, $sql_inserir_usuario);
-            mysqli_stmt_bind_param($stmt_inserir, "sss", $nome, $login, $senha);
-
+            // ALTERADO: Variável $nome para $apelido
+            mysqli_stmt_bind_param($stmt_inserir, "sss", $apelido, $login, $senha); 
+            
             if(mysqli_stmt_execute($stmt_inserir)){
-                // Redireciona para a página inicial em caso de sucesso
-                header("Location: homePage.php");
-                exit();
+                header("Location: login.php?cadastro_sucesso=1");
+                exit;
             } else {
-                // Em caso de erro na inserção, você pode definir uma mensagem geral
-                // para fins de depuração ou exibição
-                // $erro_mensagem_login = "Erro ao registrar usuário.";
+                $erro_mensagem_login = "Erro ao registrar. Tente novamente.";
             }
+            mysqli_stmt_close($stmt_inserir);
         }
+        mysqli_stmt_close($stmt_verificar);
     } else {
-        // Se as senhas não conferem, define a mensagem de erro para o campo de senha
-        $erro_mensagem_senha = "Senhas não conferem!";
+        $erro_mensagem_senha = "As senhas não coincidem!";
     }
 }
 ?>
-
-<!doctype html>
-<html lang="pt-br">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Registrar</title>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="registrar.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  </head>
-  <body>
-    <div class="container d-flex justify-content-center align-items-center min-vh-100">
-      <div class="card p-4 shadow-lg" style="width: 100%; max-width: 420px;">
-        <h2 class="text-center mb-4">Cadastro</h2>
-        <form method="POST">
-          <div class="mb-3 input-group">
-            <span class="input-group-text bg-light"><i data-lucide="user"></i></span>
-            <input type="text" name="nome" class="form-control" placeholder="Nome completo" required>
+    <script src="https://unpkg.com/lucide@latest"></script></head>
+<body class="d-flex justify-content-center align-items-center vh-100">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-6 col-lg-5">
+        <div class="card p-4 shadow-lg">
+          <h2 class="text-center mb-4">Cadastro de Usuário</h2>
+          <form method="POST">
+            
+            <div class="input-group-with-error">
+              <label for="apelido" class="form-label">Apelido</label> 
+              <div class="input-group">
+                <span class="input-group-text bg-light"><i data-lucide="user"></i></span>
+                <input type="text" name="apelido" id="apelido" class="form-control" placeholder=" Insira o seu apelido (como gostaria de ser chamado)" required value="<?= $_POST['apelido'] ?? '' ?>"> 
+              </div>
+            </div>
+
+            <div class="input-group-with-error">
+              <label for="email" class="form-label">E-mail</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light"><i data-lucide="mail"></i></span>
+                <input type="email" name="email" id="email" class="form-control" placeholder="Seu E-mail" required value="<?= $_POST['email'] ?? '' ?>">
+              </div>
+              <?php if ($erro_mensagem_login): ?>
+                  <div class="text-danger mt-1 error-message"><?= $erro_mensagem_login ?></div>
+              <?php endif; ?>
+            </div>
+
+            <div class="input-group-with-error">
+              <label for="senha" class="form-label">Senha</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light"><i data-lucide="lock"></i></span>
+                <input type="password" name="senha" id="senha" class="form-control" placeholder="Crie uma senha" required>
+                <button type="button" class="btn btn-outline-secondary" data-target="senha">
+                    <i class="fa-solid fa-eye-slash eye-icon"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="input-group-with-error">
+              <label for="confirmacao" class="form-label">Confirmar Senha</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light"><i data-lucide="lock"></i></span>
+                <input type="password" name="confirmacao" id="confirmacao" class="form-control" placeholder="Confirme sua senha" required>
+                <button type="button" class="btn btn-outline-secondary" data-target="confirmacao">
+                    <i class="fa-solid fa-eye-slash eye-icon"></i>
+                </button>
+              </div>
+              <?php if ($erro_mensagem_senha): ?>
+                  <div class="text-danger mt-1 error-message"><?= $erro_mensagem_senha ?></div>
+              <?php endif; ?>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 mt-4">Cadastrar</button>
+          </form>
+          <div class="text-center mt-3">
+              <p>Já tem conta? <a href="login.php" class="btn-link">Faça login aqui</a></p>
           </div>
-          <div class="mb-3 input-group">
-            <span class="input-group-text bg-light"><i data-lucide="at-sign"></i></span>
-            <input type="text" name="user" class="form-control" placeholder="Usuário" required>
-          </div>
-          <?php if (!empty($erro_mensagem_login)): ?>
-            <div class="text-danger error-message">Já existe um usuário com esse nome!</div>
-          <?php endif; ?>
-          
-          <div class="mb-3 input-group">
-            <span class="input-group-text bg-light"><i data-lucide="lock"></i></span>
-            <input type="password" name="senha" id="senha" class="form-control" placeholder="Senha" required>
-            <button type="button" class="btn btn-outline-secondary" data-target="senha">
-                <i class="fa-solid fa-eye eye-icon"></i>
-            </button>
-          </div>
-          
-          <div class="mb-3 input-group">
-            <span class="input-group-text bg-light"><i data-lucide="shield-check"></i></span>
-            <input type="password" name="confirmacao" id="confirma_senha" class="form-control" placeholder="Confirmar senha" required>
-            <button type="button" class="btn btn-outline-secondary" data-target="confirma_senha">
-                <i class="fa-solid fa-eye eye-icon"></i>
-            </button>
-          </div>
-          
-          <?php if (!empty($erro_mensagem_senha)): ?>
-            <div class="text-danger mt-3"><?php echo htmlspecialchars($erro_mensagem_senha); ?></div>
-          <?php endif; ?>
-          <div class="d-grid gap-2">
-            <button class="btn btn-primary">Registrar</button>
-            <a href="login.php" class="btn btn-link text-center">Já tenho conta</a>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
+  </div>
 
-    <script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script> <script>
+      // Inicializa os ícones do Lucide
       lucide.createIcons();
       
-      // Função para desaparecer a mensagem de erro
-      document.addEventListener("DOMContentLoaded", function() {
+      // Script para fazer a mensagem de erro desaparecer
+      document.addEventListener('DOMContentLoaded', function() {
           const errorMessage = document.querySelector('.text-danger');
           if (errorMessage) {
               // Aguarda 3 segundos antes de começar a desaparecer

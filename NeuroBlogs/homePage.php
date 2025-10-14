@@ -405,6 +405,52 @@ $pagina = $_GET['pagina'] ?? 'home';
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
     <link rel="stylesheet" href="homePage.css">
+    <style>
+        /* Estilos adicionais para o Preview de Imagem (ajuste se precisar de um arquivo CSS dedicado) */
+        .image-preview-container {
+            display: none; /* Escondido por padrão */
+            margin-top: 10px;
+        }
+        .image-preview {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        /* Estilos para o botão de like */
+        .like-icon {
+            color: #ccc; /* Cor padrão */
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .like-icon.liked {
+            color: #e31b23; /* Cor vermelha quando curtido */
+        }
+        /* Estilos para o Modal de Confirmação */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+        .modal-overlay.show {
+            display: flex;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
 </head>
 <body class="h-screen flex bg-[#eef3f8]">
     <nav class="navigation w-20 bg-white rounded-r-xl shadow-lg flex flex-col pt-6 fixed top-0 left-0 h-screen z-10">
@@ -430,8 +476,8 @@ $pagina = $_GET['pagina'] ?? 'home';
                 </button>
             </li>
             <li class="list w-full flex justify-center logout-button">
-                <button type="button" onclick="showLogoutConfirmation();" class="flex items-center justify-center text-lg rounded-xl transition-all duration-300">
-                    <i class="fa-solid fa-right-from-bracket"></i>
+                <button type="button" onclick="showLogoutConfirmation();" class="flex flex-col items-center justify-center text-lg rounded-xl transition-all duration-300 w-11/12 h-16 hover:bg-red-50 gap-1">
+                    <i class="fa-solid fa-right-from-bracket text-3xl text-red-500 hover:text-red-700"></i>
                     <span>Sair</span>
                 </button>
             </li>
@@ -547,7 +593,7 @@ $pagina = $_GET['pagina'] ?? 'home';
                     <div id="posts-container">
                     <?php
                     // ATUALIZAÇÃO: Adicionadas as novas colunas à query de seleção
-                    $sql_posts = "SELECT p.*, u.nome AS autor_nome, p.formato, p.tipo_analise, p.aviso_sensibilidade,
+                    $sql_posts = "SELECT p.*, u.apelido AS autor_nome, p.formato, p.tipo_analise, p.aviso_sensibilidade,
                                         (SELECT COUNT(*) FROM curtidas WHERE id_postagem = p.id) AS total_curtidas,
                                         (SELECT COUNT(*) FROM curtidas WHERE id_postagem = p.id AND id_usuario = ?) AS curtiu_usuario
                                     FROM postagens p 
@@ -605,7 +651,7 @@ $pagina = $_GET['pagina'] ?? 'home';
                                     <h6 class="font-semibold text-gray-700 mb-2">Comentários</h6>
                                     <div id="comments-list-<?php echo $post['id']; ?>">
                                         <?php
-                                        $sql_comments = "SELECT c.*, u.nome AS autor_comentario_nome FROM comentarios c JOIN usuarios u ON c.id_usuario = u.id WHERE c.id_postagem = ? ORDER BY c.data_criacao ASC";
+                                        $sql_comments = "SELECT c.*, u.apelido AS autor_comentario_nome FROM comentarios c JOIN usuarios u ON c.id_usuario = u.id WHERE c.id_postagem = ? ORDER BY c.data_criacao ASC";
                                         $stmt_comments = $conn->prepare($sql_comments);
                                         $stmt_comments->bind_param("i", $post['id']);
                                         $stmt_comments->execute();
@@ -630,7 +676,7 @@ $pagina = $_GET['pagina'] ?? 'home';
                                             }
                                             $stmt_comments->close();
                                         } else {
-                                            echo '<p id="no-comments-message-'.$post['id'].'" class="text-sm text-gray-500">Nenhum comentário ainda.</p>';
+                                            echo '<p id="no-comments-message-' . $post['id'] . '" class="text-sm text-gray-500">Nenhum comentário ainda.</p>';
                                         }
                                         ?>
                                     </div>
@@ -644,295 +690,282 @@ $pagina = $_GET['pagina'] ?? 'home';
                             <?php
                         }
                     } else {
-                        echo '<p class="text-gray-500 text-center">Nenhuma postagem encontrada.</p>';
+                        echo '<p class="text-gray-500 p-4 bg-white rounded-lg shadow-md">Nenhuma postagem encontrada.</p>';
                     }
                     $stmt_posts->close();
                     ?>
                     </div>
                 </div>
             </div>
-        <?php } elseif ($pagina == 'profile') { ?>
-            <h2 class="text-3xl font-bold text-[#1da1f2] mb-4">Perfil</h2>
-            <div class="bg-white p-6 rounded-lg shadow-lg">
-                <p class="text-lg text-gray-700">Bem-vindo, <b><?php echo htmlspecialchars($userName); ?></b>!</p>
-                <p class="text-gray-500 mt-2">Aqui você pode visualizar e editar suas informações de perfil.</p>
+            <?php
+        } elseif ($pagina == 'profile') {
+            
+            // 1. FETCH DE DADOS DO USUÁRIO (AGORA USANDO LEFT JOIN NA TABELA 'perfil_usuario')
+            $sql_profile = "SELECT u.apelido, u.email, 
+                                   p.pronoun, p.neurotipos, p.bio_pessoal, 
+                                   p.cor_fundo_pref, p.cor_texto_pref 
+                            FROM usuarios u
+                            LEFT JOIN perfil_usuario p ON u.id = p.id 
+                            WHERE u.id = ?";
+            $stmt_profile = $conn->prepare($sql_profile);
+            $stmt_profile->bind_param("i", $userId);
+            $stmt_profile->execute();
+            $user_data = $stmt_profile->get_result()->fetch_assoc();
+            $stmt_profile->close();
+
+            // 2. CONTAGEM DE POSTS 
+            $sql_contagem = "SELECT COUNT(*) AS total_posts, 
+                                SUM(CASE WHEN tipo_analise = 'resumo-rapido' THEN 1 ELSE 0 END) AS total_apoio
+                            FROM postagens WHERE usuario_id = ?";
+            $stmt_contagem = $conn->prepare($sql_contagem);
+            $stmt_contagem->bind_param("i", $userId);
+            $stmt_contagem->execute();
+            $contagem_data = $stmt_contagem->get_result()->fetch_assoc();
+            $stmt_contagem->close();
+            
+            $total_posts = $contagem_data['total_posts'];
+            $total_apoio = $contagem_data['total_apoio']; 
+
+            // 3. APLICAÇÃO DAS CORES DE ACESSIBILIDADE
+            // Se o join falhar por algum motivo, ele usará os valores padrão da tabela perfil_usuario, mas fazemos um fallback caso o JOIN não encontre nada.
+            $fundo_pref = htmlspecialchars($user_data['cor_fundo_pref'] ?? '#FFFFFF'); 
+            $texto_pref = htmlspecialchars($user_data['cor_texto_pref'] ?? '#374151'); 
+            
+            $feed_style = "background-color: {$fundo_pref}; color: {$texto_pref};";
+            ?>
+            <div class="flex flex-col lg:flex-row gap-8">
+                
+                <div class="w-full lg:w-1/3">
+                    <div class="post-card sticky top-8 p-6">
+                        <div class="flex flex-col items-center">
+                            <div class="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mb-4 border-4 border-purple-500">
+                                <i class="fa-solid fa-seedling text-4xl text-purple-600"></i>
+                            </div>
+                            
+                            <h3 class="text-2xl font-bold text-gray-800"><?php echo htmlspecialchars($user_data['apelido']); ?></h3>
+                            
+                            <p class="text-sm font-medium text-gray-500 mb-2">
+                                <?php echo htmlspecialchars($user_data['pronoun'] ?: "Pronome não definido"); ?>
+                            </p>
+                            
+                            <p class="text-md font-semibold text-purple-700 p-1 rounded-md bg-purple-100 border border-purple-300 mb-4 text-center">
+                                <i class="fa-solid fa-mask mr-1"></i> **Neurotipos:** <?php echo htmlspecialchars($user_data['neurotipos'] ?: "Ainda não informado"); ?>
+                            </p>
+                            
+                            <h4 class="text-sm font-bold text-gray-600 mb-2 border-b w-full text-left">Sobre Minha Jornada:</h4>
+                            <p class="text-gray-700 w-full mb-6 text-sm italic p-2 rounded-lg border">
+                                <?php echo nl2br(htmlspecialchars($user_data['bio_pessoal'] ?: "Compartilhando minha jornada neurodivergente e buscando conexões significativas.")); ?>
+                            </p>
+                            
+                            <div class="w-full mb-6 p-3 border border-gray-200 rounded-lg">
+                                <h4 class="text-sm font-bold text-gray-600 mb-2">Preferências de Acessibilidade:</h4>
+                                <div class="flex items-center text-xs text-gray-700 gap-2">
+                                    <i class="fa-solid fa-palette text-purple-500"></i>
+                                    <span class="font-semibold">Cores do Perfil:</span>
+                                    <div class="w-4 h-4 rounded-full border border-gray-500" style="background-color: <?php echo $fundo_pref; ?>;"></div>
+                                    /
+                                    <div class="w-4 h-4 rounded-full border border-gray-500" style="background-color: <?php echo $texto_pref; ?>;"></div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Este feed está ajustado para o meu conforto visual.</p>
+                            </div>
+
+                            <div class="flex justify-around w-full mt-2 text-center">
+                                <div>
+                                    <p class="text-2xl font-bold text-gray-800"><?php echo $total_posts; ?></p>
+                                    <p class="text-sm text-gray-500">Publicações</p>
+                                </div>
+                                <div>
+                                    <p class="text-2xl font-bold text-purple-600"><?php echo $total_apoio; ?></p>
+                                    <p class="text-sm text-purple-500 font-medium">Posts de Apoio</p>
+                                </div>
+                            </div>
+                            
+                            <button onclick="window.location.href='?pagina=settings'" class="mt-6 w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 rounded-lg transition-colors duration-200">
+                                Ajustar Preferências e Bio
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="w-full lg:w-2/3">
+                    <h2 class="text-2xl font-bold text-gray-700 mb-4 border-b-2 border-purple-500 pb-2">Minha Atividade Recente</h2>
+                    
+                    <div id="user-posts-feed">
+                        <?php
+                        // Query para buscar SOMENTE os posts do usuário logado ($userId)
+                        $sql_user_posts = "SELECT p.*, u.apelido AS autor_nome, p.formato, p.tipo_analise, p.aviso_sensibilidade,
+                                                    (SELECT COUNT(*) FROM curtidas WHERE id_postagem = p.id) AS total_curtidas,
+                                                    (SELECT COUNT(*) FROM curtidas WHERE id_postagem = p.id AND id_usuario = ?) AS curtiu_usuario
+                                                FROM postagens p 
+                                                JOIN usuarios u ON p.usuario_id = u.id 
+                                                WHERE p.usuario_id = ?
+                                                ORDER BY p.data_criacao DESC";
+                        $stmt_user_posts = $conn->prepare($sql_user_posts);
+                        $stmt_user_posts->bind_param("ii", $userId, $userId); 
+                        $stmt_user_posts->execute();
+                        $result_user_posts = $stmt_user_posts->get_result();
+                        
+                        if ($result_user_posts->num_rows > 0) {
+                            while ($post = $result_user_posts->fetch_assoc()) {
+                                
+                                // O CARD DE POSTAGEM RECEBE O ESTILO INLINE DE ACESSIBILIDADE
+                                ?>
+                                <div class="post-card mb-6" data-post-id="<?php echo $post['id']; ?>" style="<?php echo $feed_style; ?>">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex items-center">
+                                            <i class="fa-solid fa-user-circle text-2xl mr-2" style="color: <?php echo $texto_pref; ?>;"></i>
+                                            <div>
+                                                <p class="font-semibold" style="color: <?php echo $texto_pref; ?>;"><?php echo htmlspecialchars($post['autor_nome']); ?></p>
+                                                <p class="text-sm text-gray-500">
+                                                    <?php echo date("d/m/Y H:i", strtotime($post['data_criacao'])); ?> 
+                                                    <span class="ml-2 text-xs font-medium text-purple-600">[<?php echo ucfirst(str_replace('-', ' ', $post['tipo_analise'])); ?>]</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <?php if ($post['usuario_id'] == $userId): ?>
+                                            <button type="button" onclick="showDeleteConfirmation('post', <?php echo $post['id']; ?>);" class="text-gray-500 hover:text-red-500 transition-colors duration-200" title="Excluir postagem">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if (!empty($post['conteudo'])): ?>
+                                        <p class="mb-3" style="color: <?php echo $texto_pref; ?>;"><?php echo htmlspecialchars($post['conteudo']); ?></p>
+                                    <?php endif; ?>
+                                    <?php if (!empty($post['imagem'])): ?>
+                                        <div class="my-3">
+                                            <img src="<?php echo htmlspecialchars($post['imagem']); ?>" alt="Imagem da postagem" class="rounded-lg max-w-full h-auto">
+                                        </div>
+                                    <?php endif; ?>
+                                    
+                                    <div class="flex items-center gap-4 mt-3 pt-3 border-t border-gray-300">
+                                        <span onclick="toggleLike(<?php echo $post['id']; ?>)" class="flex items-center transition-colors duration-200 like-button" style="color: <?php echo $texto_pref; ?>;">
+                                            <i id="like-icon-<?php echo $post['id']; ?>" class="fa-solid fa-heart mr-1 like-icon <?php echo $post['curtiu_usuario'] > 0 ? 'liked' : ''; ?>"></i>
+                                            <span id="like-count-<?php echo $post['id']; ?>"><?php echo $post['total_curtidas']; ?></span>
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="comment-container">
+                                        <h6 class="font-semibold mb-2" style="color: <?php echo $texto_pref; ?>;">Comentários</h6>
+                                        <p class="text-sm text-gray-500">A lógica de comentários completa deve ser inserida aqui, garantindo que o `style` seja aplicado também.</p>
+                                    </div>
+                                </div>
+                                <?php
+                            }
+                        } else {
+                            echo '<p class="text-gray-500 p-4 bg-white rounded-lg shadow-md">Você ainda não publicou nenhuma análise ou postagem.</p>';
+                        }
+                        $stmt_user_posts->close();
+                        ?>
+                    </div>
+                </div>
             </div>
-        <?php } elseif ($pagina == 'settings') { ?>
-            <h2 class="text-3xl font-bold text-[#1da1f2] mb-4">Configurações</h2>
-            <div class="bg-white p-6 rounded-lg shadow-lg">
-                <p class="text-gray-700">Esta é a página de configurações. Em breve, você poderá gerenciar as configurações da sua conta aqui.</p>
-            </div>
-        <?php } ?>
+            <?php
+        } elseif ($pagina == 'settings') {
+            echo '<h2 class="text-3xl font-bold text-[#1da1f2] mb-4">Configurações</h2>';
+            echo '<p class="text-gray-600 text-lg">Aqui você pode ajustar sua biografia, neurotipos e preferências de acessibilidade. (Próxima etapa!)</p>';
+        }
+        ?>
     </main>
 
-    <div id="delete-modal" class="modal-overlay">
+    <div id="logout-confirmation-modal" class="modal-overlay">
         <div class="modal-content">
-            <h4 class="text-lg font-semibold mb-4">Confirmar Exclusão</h4>
-            <p id="delete-message" class="text-gray-600 mb-6"></p>
-            <div class="flex justify-center gap-4">
-                <button id="cancel-delete-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors duration-200">Cancelar</button>
-                <button id="confirm-delete-btn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200">Excluir</button>
+            <h3 class="text-xl font-bold mb-4">Confirmar Saída</h3>
+            <p class="mb-6">Tem certeza de que deseja sair da sua conta?</p>
+            <div class="flex justify-end gap-3">
+                <button onclick="hideLogoutConfirmation();" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded transition duration-200">Cancelar</button>
+                <a href="logout.php" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition duration-200">Sair</a>
             </div>
         </div>
     </div>
-
-    <div id="logout-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h4 class="text-lg font-semibold mb-4">Confirmar Saída</h4>
-            <p class="text-gray-600 mb-6">Você tem certeza que deseja sair?</p>
-            <div class="flex justify-center gap-4">
-                <button id="cancel-logout-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors duration-200">Cancelar</button>
-                <a href="logout.php" id="confirm-logout-btn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200">Sair</a>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
     <script>
-        let itemTypeToDelete = '';
-        let itemIdToDelete = 0;
-
-        function showDeleteConfirmation(type, id) {
-            itemTypeToDelete = type;
-            itemIdToDelete = id;
-            let message = '';
-            if (type === 'post') {
-                message = "Você tem certeza que deseja excluir esta postagem? Esta ação não pode ser desfeita.";
-            } else if (type === 'comment') {
-                message = "Você tem certeza que deseja excluir este comentário?";
-            }
-            document.getElementById('delete-message').innerText = message;
-            document.getElementById('delete-modal').classList.add('show');
-        }
-
-        function hideDeleteConfirmation() {
-            document.getElementById('delete-modal').classList.remove('show');
-        }
-
-        document.getElementById('cancel-delete-btn').addEventListener('click', hideDeleteConfirmation);
-        document.getElementById('delete-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'delete-modal') {
-                hideDeleteConfirmation();
-            }
-        });
-
-        document.getElementById('confirm-delete-btn').addEventListener('click', () => {
-            if (itemTypeToDelete === 'post') {
-                deletePost(itemIdToDelete);
-            } else if (itemTypeToDelete === 'comment') {
-                deleteComment(itemIdToDelete);
-            }
-            hideDeleteConfirmation();
-        });
-        
+        // Funções de Modal (Sair)
         function showLogoutConfirmation() {
-            document.getElementById('logout-modal').classList.add('show');
+            document.getElementById('logout-confirmation-modal').classList.add('show');
         }
-
         function hideLogoutConfirmation() {
-            document.getElementById('logout-modal').classList.remove('show');
+            document.getElementById('logout-confirmation-modal').classList.remove('show');
         }
 
-        document.getElementById('cancel-logout-btn').addEventListener('click', hideLogoutConfirmation);
-        document.getElementById('logout-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'logout-modal') {
-                hideLogoutConfirmation();
-            }
-        });
-
-        // Adiciona a funcionalidade de clique fora do modal para fechar
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                hideDeleteConfirmation();
-                hideLogoutConfirmation();
-            }
-        });
-
-        async function toggleLike(postId) {
-            try {
-                const response = await fetch(`homePage.php?action=like&post_id=${postId}`);
-                const result = await response.json();
-                if (result.success) {
-                    const likeCountElement = document.getElementById(`like-count-${postId}`);
-                    const likeIconElement = document.getElementById(`like-icon-${postId}`);
-                    likeCountElement.innerText = result.count;
-                    if (result.liked) {
-                        likeIconElement.classList.add('liked');
-                    } else {
-                        likeIconElement.classList.remove('liked');
-                    }
+        // Função de Confirmação de Exclusão (Geral)
+        function showDeleteConfirmation(type, id) {
+            if (confirm(`Tem certeza que deseja excluir este ${type}? Esta ação é irreversível.`)) {
+                if (type === 'post') {
+                    deletePost(id);
+                } else if (type === 'comment') {
+                    deleteComment(id);
                 }
-            } catch (error) {
-                console.error('Erro ao curtir/descurtir:', error);
-            }
-        }
-
-        async function deletePost(postId) {
-            try {
-                const response = await fetch(`homePage.php?action=delete_post&post_id=${postId}`);
-                const result = await response.json();
-                if (result.success) {
-                    document.querySelector(`div[data-post-id="${postId}"]`).remove();
-                }
-            } catch (error) {
-                console.error('Erro ao excluir postagem:', error);
-            }
-        }
-
-        async function deleteComment(commentId) {
-            try {
-                const response = await fetch(`homePage.php?action=delete_comment&comment_id=${commentId}`);
-                const result = await response.json();
-                if (result.success) {
-                    const commentElement = document.querySelector(`div[data-comment-id="${commentId}"]`);
-                    const commentsList = commentElement.closest('.comment-container').querySelector('#comments-list-' + commentElement.closest('[data-post-id]').dataset.postId);
-                    commentElement.remove();
-                    if (commentsList && commentsList.children.length === 0) {
-                        const noCommentsMessage = document.createElement('p');
-                        noCommentsMessage.id = 'no-comments-message-' + commentElement.closest('[data-post-id]').dataset.postId;
-                        noCommentsMessage.className = 'text-sm text-gray-500';
-                        noCommentsMessage.innerText = 'Nenhum comentário ainda.';
-                        commentsList.appendChild(noCommentsMessage);
-                    }
-                }
-            } catch (error) {
-                console.error('Erro ao excluir comentário:', error);
             }
         }
         
-        // --- Lida com o preview da imagem ---
-        document.getElementById('post_image').addEventListener('change', function(event) {
-            const previewContainer = document.getElementById('image-preview-container');
-            const previewImage = document.getElementById('image-preview');
-            const file = event.target.files[0];
-            
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    previewImage.src = e.target.result;
-                    previewContainer.style.display = 'block';
-                }
-                reader.readAsDataURL(file);
-            } else {
-                previewImage.src = '';
-                previewContainer.style.display = 'none';
-            }
-        });
-
-        // --- Funções para lidar com postagem e comentários via AJAX ---
-        const postForm = document.getElementById('post-form');
-        const postsContainer = document.getElementById('posts-container');
-        const postButton = document.getElementById('post-button');
-        const postTextarea = postForm.querySelector('textarea[name="post_text"]');
-        const postImageInput = postForm.querySelector('input[name="post_image"]');
-
-        function updatePostButtonState() {
-            const textContent = postTextarea.value.trim();
-            const hasImage = postImageInput.files.length > 0;
-            postButton.disabled = !(textContent || hasImage);
-            if (postButton.disabled) {
-                postButton.classList.add('opacity-50', 'cursor-not-allowed');
-            } else {
-                postButton.classList.remove('opacity-50', 'cursor-not-allowed');
-            }
-        }
-
-        postTextarea.addEventListener('input', updatePostButtonState);
-        postImageInput.addEventListener('change', updatePostButtonState);
-        updatePostButtonState();
-
-        function attachCommentFormListener(form) {
-            form.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                const formData = new FormData(this);
-                const commentInput = this.querySelector('input[name="comment_text"]');
-                const submitButton = this.querySelector('button[type="submit"]');
-                const originalButtonText = submitButton.innerText;
-
-                submitButton.disabled = true;
-                submitButton.innerText = 'Comentando...';
-
-                try {
-                    const response = await fetch('homePage.php', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        const commentsList = document.getElementById(`comments-list-${result.post_id}`);
-                        const noCommentsMessage = document.getElementById(`no-comments-message-${result.post_id}`);
-                        if (noCommentsMessage) {
-                            noCommentsMessage.remove();
+        // Função de Exclusão de Post (AJAX)
+        function deletePost(postId) {
+            fetch(`homePage.php?action=delete_post&post_id=${postId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const postElement = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+                        if (postElement) {
+                            postElement.remove();
                         }
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = result.new_comment_html.trim();
-                        commentsList.prepend(tempDiv.firstChild);
-                        commentInput.value = '';
+                    } else {
+                        alert('Erro ao excluir a postagem.');
                     }
-                } catch (error) {
-                    console.error('Erro ao enviar comentário:', error);
-                } finally {
-                    submitButton.disabled = false;
-                    submitButton.innerText = originalButtonText;
-                }
-            });
+                })
+                .catch(error => console.error('Erro de rede/AJAX na exclusão do post:', error));
         }
 
-        postForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-
-            postButton.disabled = true;
-            postButton.classList.add('opacity-50', 'cursor-not-allowed');
-            
-            try {
-                const response = await fetch('homePage.php', {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await response.json();
-
-                if (result.success) {
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = result.new_post_html.trim();
-                    const newPostNode = tempDiv.firstChild;
-                    postsContainer.prepend(newPostNode);
-
-                    postTextarea.value = '';
-                    postImageInput.value = '';
-                    document.getElementById('image-preview-container').style.display = 'none';
-                    document.getElementById('image-preview').src = '';
-                    updatePostButtonState();
-                    
-                    // Anexar o listener de comentário ao novo post
-                    const newCommentForm = newPostNode.querySelector('.comment-form');
-                    if (newCommentForm) {
-                        attachCommentFormListener(newCommentForm);
+        // Função de Exclusão de Comentário (AJAX)
+        function deleteComment(commentId) {
+            fetch(`homePage.php?action=delete_comment&comment_id=${commentId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const commentElement = document.querySelector(`.comment[data-comment-id="${commentId}"]`);
+                        if (commentElement) {
+                            const postCard = commentElement.closest('.post-card');
+                            const postId = postCard ? postCard.dataset.postId : null;
+                            const commentsList = commentElement.closest(`#comments-list-${postId}`);
+                            
+                            commentElement.remove();
+                            
+                            // Se não houver mais comentários, mostra a mensagem "Nenhum comentário ainda"
+                            if (commentsList && commentsList.children.length === 0 && postId) {
+                                commentsList.innerHTML = `<p id="no-comments-message-${postId}" class="text-sm text-gray-500">Nenhum comentário ainda.</p>`;
+                            }
+                        }
+                    } else {
+                        alert('Erro ao excluir o comentário.');
                     }
-                }
-            } catch (error) {
-                console.error('Erro:', error);
-            } finally {
-                postButton.disabled = false;
-                postButton.classList.remove('opacity-50', 'cursor-not-allowed');
-            }
-        });
+                })
+                .catch(error => console.error('Erro de rede/AJAX na exclusão do comentário:', error));
+        }
 
-        // Event Listener para os formulários de comentários existentes (no carregamento da página)
-        document.addEventListener('DOMContentLoaded', () => {
-            const commentForms = document.querySelectorAll('.comment-form');
-            commentForms.forEach(form => {
-                attachCommentFormListener(form);
-            });
-            // Apenas executa a filtragem inicial, mas NÃO adiciona listener de 'change'
-            aplicarFiltros(); 
-        });
+        // Função de Curtir/Descurtir (AJAX)
+        function toggleLike(postId) {
+            fetch(`homePage.php?action=like&post_id=${postId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const icon = document.getElementById(`like-icon-${postId}`);
+                        const count = document.getElementById(`like-count-${postId}`);
+                        
+                        count.textContent = data.count;
 
-        // --- Implementação da Lógica de Filtros Avançados (JavaScript) ---
+                        if (data.liked) {
+                            icon.classList.add('liked');
+                        } else {
+                            icon.classList.remove('liked');
+                        }
+                    }
+                })
+                .catch(error => console.error('Erro de rede/AJAX no like:', error));
+        }
+
+        // Função para Aplicar Filtros
         function aplicarFiltros() {
             const posts = document.querySelectorAll('#posts-container .post-card');
-
-            // 1. Coleta os filtros selecionados, agrupados por categoria
+            // Obtém os valores dos filtros ativos (checked) em cada grupo
             const formatoFilters = Array.from(document.querySelectorAll('.formato-filter:checked')).map(cb => cb.value);
             const analiseFilters = Array.from(document.querySelectorAll('.analise-filter:checked')).map(cb => cb.value);
             const sensibilidadeFilters = Array.from(document.querySelectorAll('.sensibilidade-filter:checked')).map(cb => cb.value);
@@ -948,7 +981,7 @@ $pagina = $_GET['pagina'] ?? 'home';
 
                 // Lógica de Filtragem: O post deve satisfazer TODOS os grupos de filtros que estão ativos (AND LÓGICO).
 
-                // A. Verifica o grupo Formato
+                // A. Verifica o grupo Formato (OR lógico dentro do grupo: se filtros ativos, precisa bater com pelo menos um)
                 if (formatoFilters.length > 0) {
                     passesFormato = formatoFilters.includes(postFormato);
                 }
@@ -971,6 +1004,123 @@ $pagina = $_GET['pagina'] ?? 'home';
                 }
             });
         }
+
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Lógica para fechar o modal ao clicar fora
+            const modalOverlay = document.getElementById('logout-confirmation-modal');
+            if (modalOverlay) {
+                modalOverlay.addEventListener('click', function(e) {
+                    if (e.target === modalOverlay) {
+                        hideLogoutConfirmation();
+                    }
+                });
+            }
+            
+            // --- 1. Lógica de Preview de Imagem (Upload) ---
+            const imageInput = document.getElementById('post_image');
+            const imagePreview = document.getElementById('image-preview');
+            const previewContainer = document.getElementById('image-preview-container');
+
+            if (imageInput && imagePreview && previewContainer) {
+                imageInput.addEventListener('change', function() {
+                    if (this.files && this.files[0]) {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            imagePreview.src = e.target.result;
+                            previewContainer.style.display = 'block';
+                        }
+                        reader.readAsDataURL(this.files[0]);
+                    } else {
+                        imagePreview.src = '#';
+                        previewContainer.style.display = 'none';
+                    }
+                });
+            }
+            
+            // --- 2. Lógica de Submissão do Formulário de Post (AJAX) ---
+            const postForm = document.getElementById('post-form');
+            if (postForm) {
+                postForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const postButton = document.getElementById('post-button');
+                    postButton.disabled = true;
+                    postButton.textContent = 'Postando...';
+
+                    const formData = new FormData(this);
+                    
+                    fetch('homePage.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const postsContainer = document.getElementById('posts-container');
+                            postsContainer.insertAdjacentHTML('afterbegin', data.new_post_html); // Adiciona no topo
+                            postForm.reset();
+                            imagePreview.src = '#';
+                            previewContainer.style.display = 'none';
+                        } else {
+                            alert('Erro ao publicar o post. Tente novamente.');
+                        }
+                        postButton.disabled = false;
+                        postButton.textContent = 'Postar';
+                    })
+                    .catch(error => {
+                        console.error('Erro de rede/AJAX na publicação do post:', error);
+                        alert('Erro de conexão ao publicar o post.');
+                        postButton.disabled = false;
+                        postButton.textContent = 'Postar';
+                    });
+                });
+            }
+            
+            // --- 3. Lógica de Submissão do Formulário de Comentário (AJAX) ---
+            document.querySelectorAll('.comment-form').forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const commentInput = this.querySelector('input[name="comment_text"]');
+                    const commentText = commentInput.value.trim();
+                    const postId = this.dataset.postId;
+                    
+                    if (commentText === '') return;
+                    
+                    const formData = new FormData();
+                    formData.append('post_id', postId);
+                    formData.append('comment_text', commentText);
+
+                    fetch('homePage.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const commentsList = document.getElementById(`comments-list-${postId}`);
+                            const noCommentsMessage = document.getElementById(`no-comments-message-${postId}`);
+                            
+                            // Remove a mensagem 'Nenhum comentário ainda.' se ela existir
+                            if (noCommentsMessage) {
+                                noCommentsMessage.remove();
+                            }
+                            
+                            commentsList.insertAdjacentHTML('beforeend', data.new_comment_html);
+                            commentInput.value = ''; // Limpa o campo
+                        } else {
+                            alert('Erro ao publicar o comentário. Tente novamente.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro de rede/AJAX na publicação do comentário:', error);
+                        alert('Erro de conexão ao publicar o comentário.');
+                    });
+                });
+            });
+
+        });
     </script>
 </body>
 </html>

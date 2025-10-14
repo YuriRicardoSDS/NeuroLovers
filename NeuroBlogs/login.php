@@ -3,14 +3,15 @@ session_start();
 include 'conexao.php'; 
 $erro = ''; 
 If ($_SERVER['REQUEST_METHOD'] == 'POST') { 
-    $login = $_POST['user']; 
+    $login = $_POST['email']; 
     $senha = $_POST['senha']; 
     // A variável $conn é definida em 'conexao.php'
-    $sql = "SELECT * FROM usuarios WHERE user = '$login'"; 
+    $sql = "SELECT * FROM usuarios WHERE email = '$login'"; 
     $res = mysqli_query($conn, $sql);
     $usuario = mysqli_fetch_assoc($res); 
     If ($usuario && password_verify($senha, $usuario['senha'])) { 
-        $_SESSION['usuario'] = $usuario['nome'];
+        // ALTERADO: Troca $usuario['nome'] por $usuario['apelido']
+        $_SESSION['usuario'] = $usuario['apelido'];
         $_SESSION['nivel'] = $usuario['nivel'];
         $_SESSION['usuario_id'] = $usuario['id']; // Adicione esta linha para salvar o ID
         if ($usuario['nivel'] == 3) {
@@ -32,23 +33,25 @@ If ($_SERVER['REQUEST_METHOD'] == 'POST') {
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/> 
   <title>Painel de Login</title> 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="login.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="login.css"> 
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head> 
-<body>
-<div class="container d-flex justify-content-center align-items-center min-vh-100">
-  <div class="card p-4 shadow-lg" style="width: 100%; max-width: 420px;">
-    <h2 class="text-center">Login</h2> 
-    <?php if ($erro): ?> 
-      <div class="alert alert-danger" role="alert"><?php echo $erro; ?></div> 
+<body> 
+<div class="main-container">
+  <div class="login-container">
+    <h2 class="mb-4">Login</h2>
+    <?php if ($erro): ?>
+        <div class="alert alert-danger" role="alert">
+            <?= $erro ?>
+        </div>
     <?php endif; ?>
-    <form method="POST"> 
-      <div class="mb-3 input-group">
-        <span class="input-group-text bg-light"><i data-lucide="at-sign"></i></span>
-        <input type="text" placeholder="Usuário" name="user" id="user" class="form-control" required/>
-      </div> 
-      <div class="mb-3 input-group">
+    <form method="POST">
+      <div class="input-group mb-3">
+        <span class="input-group-text bg-light"><i data-lucide="mail"></i></span>
+        <input type="email" placeholder="E-mail" name="email" id="email" class="form-control" required value="<?= $_POST['email'] ?? '' ?>"/>
+      </div>
+      <div class="input-group mb-3">
         <span class="input-group-text bg-light"><i data-lucide="lock"></i></span>
         <input type="password" placeholder="Senha" name="senha" id="senha" class="form-control" required/>
         <button type="button" class="btn btn-outline-secondary" id="togglePassword">
@@ -63,6 +66,7 @@ If ($_SERVER['REQUEST_METHOD'] == 'POST') {
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
 <script>
   // Inicializa os ícones do Lucide
   lucide.createIcons();
@@ -77,9 +81,9 @@ If ($_SERVER['REQUEST_METHOD'] == 'POST') {
       const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
       passwordInput.setAttribute('type', type);
       
-      // Alterna o ícone
-      eyeIcon.classList.toggle('fa-eye');
+      // Alterna o ícone (olho aberto/fechado)
       eyeIcon.classList.toggle('fa-eye-slash');
+      eyeIcon.classList.toggle('fa-eye');
   });
 </script>
 </body>
