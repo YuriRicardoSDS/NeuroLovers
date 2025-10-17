@@ -58,10 +58,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST'){
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="registrar.css">
     <script src="https://unpkg.com/lucide@latest"></script></head>
-<body class="d-flex justify-content-center align-items-center vh-100">
+<body class="d-flex justify-content-center align-items-center">
   <div class="container">
     <div class="row justify-content-center">
-      <div class="col-md-6 col-lg-5">
+      <div class="col-md-5 col-lg-4.1rem">
         <div class="card p-4 shadow-lg">
           <h2 class="text-center mb-4">Cadastro de Usuário</h2>
           <form method="POST">

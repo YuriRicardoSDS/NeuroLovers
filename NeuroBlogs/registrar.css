@@ -26,8 +26,9 @@
 /* Título */
 .card h2 {
     color: #1e3c72; /* Cor mais escura do gradiente para contraste */
-    font-weight: 600;
-    margin-bottom: 25px !important;
+    font-weight: 500;
+    /* ALTERAÇÃO: Reduzindo margem do título de 25px para 20px */
+    margin-bottom: 20px !important; 
 }
 
 /* Labels */
@@ -111,8 +112,8 @@
 
 /* Estilização para containers de input com mensagem de erro */
 .input-group-with-error {
-    /* ALTERAÇÃO AQUI: Margem reduzida de 1.5rem para 1rem */
-    margin-bottom: 1rem; 
+    /* ALTERAÇÃO FINAL: Margem reduzida de 1rem para 0.75rem para compactar mais */
+    margin-bottom: 0.55rem; 
 }
   
 .error-message {

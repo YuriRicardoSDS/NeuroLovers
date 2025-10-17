@@ -1,60 +1,38 @@
-<!DOCTYPE html>  
-<html lang="pt-BR">  
-<head>  
-  <meta charset="UTF-8" />  
-  <meta name="viewport" content="width=device-width, initial-scale=1" />  
-  <title>Index</title>  
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">  
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neuroblog</title>
   <link rel="stylesheet" href="index.css">
-  <style>
-    
-  </style>
-</head>  
-<body>  
- 
-  <nav class="navbar navbar-expand-lg navbar-custom fixed-top"> 
-    <div class="container"> 
-      <a class="navbar-brand" href="#">NeuroBlogs</a> 
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Alternar navegação"> 
-        <span class="navbar-toggler-icon"></span> 
-      </button> 
-      <div class="collapse navbar-collapse" id="navbarNav"> 
-        <ul class="navbar-nav ms-auto"> 
-          <li class="nav-item"> 
-            <a class="nav-link" href="login.php">Entrar</a> 
-          </li> 
-          <li class="nav-item"> 
-            <a class="nav-link" href="registrar.php">Cadastrar</a> 
-          </li> 
-        </ul> 
-      </div> 
-    </div> 
-  </nav> 
- 
-  <div class="container d-flex justify-content-center align-items-center central-card">
-  <div class="card text-center">
-    <img src="img/neuro.png" alt="Logo do site" class="logo-img" />
-    <h4 class="mb-4">Bem-vindo ao NeuroBlogs!</h4>
-    <button class="btn btn-custom" data-bs-toggle="modal" data-bs-target="#infoModal">
-      Ver mais informações
-    </button>
-  </div>
-</div>
- 
-  <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true"> 
-    <div class="modal-dialog"> 
-      <div class="modal-content shadow"> 
-        <div class="modal-header"> 
-          <h5 class="modal-title" id="infoModalLabel">Informações do Site</h5> 
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button> 
-        </div> 
-        <div class="modal-body"> 
-          <p>NeuroBlogs</p> 
-        </div> 
-      </div> 
-    </div> 
-  </div> 
+</head>
+<body>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script> 
-</body>  
+  <section class="hero-full-screen">
+    <div class="hero-content">
+      <div class="hero-title-wrapper">
+        
+        <video class="character-video" autoplay loop muted playsinline>
+          <source src="Vídeo sem título_Feito com o Clipchamp.mp4" type="video/mp4">
+          Seu navegador não suporta vídeos HTML5.
+        </video>
+
+        <div class="text-and-links-wrapper"> 
+          <div class="text-content">
+            <h1 class="hero-title">NeuroBlog</h1>
+            <p class="hero-subtitle">
+              Conectando mentes diversas em um espaço de empatia, expressão e interatividade.
+            </p>
+          </div>
+
+          <div class="hero-links">
+            <a href="login.php" class="link-centralizado">Entrar</a>
+            <a href="registrar.php" class="link-centralizado">Cadastrar</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</body>
 </html>
