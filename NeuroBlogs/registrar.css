@@ -6,7 +6,7 @@
 
  body { 
     /* Fundo azul com gradiente (Mantido) */
-    background: linear-gradient(to right, #1067d8 , #1e3c72);
+    background: linear-gradient(to right, #2879e4 , #2f5caa);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
     min-height: 100vh;
     display: flex; 

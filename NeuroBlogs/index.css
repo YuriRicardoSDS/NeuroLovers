@@ -45,7 +45,7 @@
 
 /* Corpo */
 body {
-  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4d8dd6 100%);
+  background: linear-gradient(135deg, #2a5298 0%, #2a5298 50%, #4d8dd6 100%);
   font-family: 'Kirsty', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #ffffff;
   margin: 0;
@@ -85,7 +85,7 @@ body {
   height: 100%;
   
   /* Gradiente base */
-  background: linear-gradient(135deg, #1e3c72, #2a5298, #4d8dd6, #6b73ff);
+  background: linear-gradient(135deg, #2a5298, #2a5298, #4d8dd6, #6b73ff);
   background-size: 400% 400%;
   animation: gradientShift 10s ease infinite;
   
@@ -117,15 +117,15 @@ body {
 @keyframes gradientShift {
   0% { 
     background-position: 0% 50%; 
-    filter: brightness(1.5) saturate(1.05);
+    filter: brightness(2.0) saturate(1.05);
   }
   50% { 
     background-position: 100% 50%; 
-    filter: brightness(1.2) saturate(1.25);
+    filter: brightness(1.0) saturate(1.25);
   }
   100% { 
     background-position: 0% 50%; 
-    filter: brightness(1.5) saturate(1.05);
+    filter: brightness(2.0) saturate(1.05);
   }
 }
 

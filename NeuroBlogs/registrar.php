@@ -35,7 +35,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST'){
             mysqli_stmt_bind_param($stmt_inserir, "sss", $apelido, $login, $senha); 
             
             if(mysqli_stmt_execute($stmt_inserir)){
-                header("Location: login.php?cadastro_sucesso=1");
+                // ----------------------------------------------------------------------
+                // 🎯 INÍCIO DA CORREÇÃO CRÍTICA: CRIAÇÃO DO PERFIL DE USUÁRIO
+                // ----------------------------------------------------------------------
+                $novo_usuario_id = mysqli_insert_id($conn); // Pega o ID do usuário recém-criado
+
+                $sql_perfil = "
+                    INSERT INTO perfil_usuario 
+                    (id, bio, foto, cor_fundo_pref, cor_texto_pref, tamanho_fonte_pref, fonte_preferida) 
+                    VALUES 
+                    (?, '', NULL, '#f5f5f5', '#2c3e50', 'medium', 'sans-serif')
+                ";
+
+                $stmt_perfil = mysqli_prepare($conn, $sql_perfil);
+                // Usa o ID recém-criado para criar a linha do perfil com valores Padrão
+                mysqli_stmt_bind_param($stmt_perfil, "i", $novo_usuario_id);
+
+                // Executa a inserção do perfil. Se falhar, o erro será interno, mas o cadastro do usuário será concluído.
+                mysqli_stmt_execute($stmt_perfil); 
+                mysqli_stmt_close($stmt_perfil);
+                // ----------------------------------------------------------------------
+                // 🎯 FIM DA CORREÇÃO CRÍTICA
+                // ----------------------------------------------------------------------
+
+                header("Location: homePage.php?cadastro_sucesso=1");
                 exit;
             } else {
                 $erro_mensagem_login = "Erro ao registrar. Tente novamente.";
