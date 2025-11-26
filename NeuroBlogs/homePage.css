@@ -416,3 +416,114 @@ body {
 .accessibility-summary {
     border: 2px dashed var(--color-primary);
 }
+
+/* homePage.css - Ajustes no Layout Principal */
+
+/* ---------------------------------------------------------------------- */
+/* 3. Layout Principal (Content Container e Colunas) */
+/* ---------------------------------------------------------------------- */
+
+/* homePage.css - Regras essenciais para o layout de 3 colunas */
+
+.main-content-wrapper {
+    display: flex; /* ESSENCIAL: Coloca os filhos (nav, main, aside) lado a lado */
+    width: 100%; 
+    min-height: 100vh;
+    /* Ajusta o padding para que o conteúdo não fique sob o menu lateral fixo */
+    padding-left: 5rem; /* Ajuste para a largura exata da sua .navigation (80px) */
+    padding-top: 1.5rem; /* Espaçamento do topo */
+}
+
+.content-container {
+    flex-grow: 1; /* Permite que o feed ocupe a maior parte do espaço central */
+    max-width: 700px; /* Largura máxima para centralizar o feed */
+    margin: 0 auto; /* Centraliza o feed horizontalmente */
+    padding: 0 1rem;
+}
+
+.filter-col {
+    width: 300px; /* Defina a largura fixa para a coluna de filtros */
+    flex-shrink: 0;
+    padding-right: 1rem;
+}
+
+/* Regra para telas menores (mobile) */
+@media (max-width: 1023px) {
+    .main-content-wrapper {
+        display: block; /* Volta para o layout vertical */
+        padding-left: 0; /* Remove o padding do menu fixo */
+    }
+    .filter-col {
+        display: none; /* Oculta a coluna de filtros em mobile (para ser mostrada em um modal/overlay) */
+    }
+}
+.main-content-wrapper-two-col {
+    display: flex; /* Habilita o Flexbox */
+    margin-left: 5rem; /* O width do menu de navegação */
+    padding: 20px;
+    gap: 20px; /* Espaço entre as colunas */
+    min-height: 100vh;
+}
+
+/* Coluna Principal (Feed) - Ocupa mais espaço */
+.feed-main-col {
+    flex-grow: 1; /* Ocupa o máximo de espaço possível */
+    max-width: 700px; /* Limita a largura do feed para melhor leitura */
+    width: 100%;
+}
+
+/* Coluna Lateral (Filtros/Sugestões) - Ocupa uma largura fixa */
+.sidebar-right {
+    width: 300px; /* Largura fixa para a coluna lateral */
+    flex-shrink: 0; /* Impede que a barra lateral encolha */
+}
+
+/* Ajustes responsivos para telas menores */
+@media (max-width: 1024px) {
+    .main-content-wrapper-two-col {
+        flex-direction: column; /* Empilha as colunas verticalmente */
+        padding: 20px;
+        margin-left: 0; /* Remove o margin do menu lateral em mobile */
+        padding-top: 80px; /* Adiciona padding para evitar que o conteúdo fique atrás do menu topo (se houver) */
+    }
+    .sidebar-right {
+        width: 100%; /* Coluna lateral ocupa 100% da largura em mobile */
+        order: -1; /* Opcional: coloca os filtros acima do feed em mobile */
+    }
+}
+/* style.css ou bloco <style> */
+
+/* 1. Configura a barra lateral como contêiner flexível vertical */
+.sidebar {
+    display: flex;
+    flex-direction: column; /* Organiza os itens de cima para baixo */
+    height: 100vh; /* Garante que a barra lateral tenha altura total da tela */
+    /* Mantenha seus estilos de largura e cor de fundo aqui */
+}
+
+/* 2. Wrapper que empurra o botão para a parte inferior */
+.logout-button-wrapper {
+    margin-top: auto; /* ESTE é o comando chave que o empurra para baixo */
+    padding: 15px 0;
+    width: 100%; 
+    text-align: right; /* ALINHA O BOTÃO PARA O LADO DIREITO (se a barra for esquerda) */
+    /* Se você quiser o botão no lado ESQUERDO da parte inferior, use text-align: left; */
+}
+
+/* 3. Estilo do botão de Logout */
+.btn-logout {
+    display: inline-block;
+    padding: 8px 15px;
+    background-color: #d9534f; 
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: 600;
+    transition: background-color 0.3s;
+    /* Adicione margem lateral se precisar separar o botão da borda da barra lateral */
+    margin-right: 15px; /* Exemplo de margem para afastar da borda direita */
+}
+
+.btn-logout:hover {
+    background-color: #c9302c;
+}

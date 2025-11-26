@@ -1,104 +1,130 @@
 <?php
+// PHP - Arquivo: criar_comunidade.php
 session_start();
-include "conexao.php";
+include "conexao.php"; // Inclui o arquivo de conexão
 
-if (!isset($_SESSION["usuario"])) {
+if (!isset($_SESSION["usuario_id"])) {
     header("Location: login.php");
     exit;
 }
 
 $userId = $_SESSION['usuario_id'];
-$mensagem = '';
-$erro = '';
+$success_message = "";
+$error_message = "";
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $nome = trim($_POST['nome_comunidade']);
-    $descricao = trim($_POST['descricao_comunidade']);
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $nome_comunidade = trim($_POST['nome_comunidade'] ?? ''); 
+    $descricao = trim($_POST['descricao'] ?? '');
 
-    // Validação básica
-    if (empty($nome) || empty($descricao)) {
-        $erro = "Todos os campos são obrigatórios.";
-    } elseif (strlen($nome) > 100) {
-        $erro = "O nome da comunidade não pode ter mais de 100 caracteres.";
+    if (empty($nome_comunidade)) {
+        $error_message = "O nome da comunidade não pode estar vazio.";
     } else {
-        // 1. Inserir a nova comunidade na tabela 'comunidades'
-        $sql_comunidade = "INSERT INTO comunidades (nome, descricao, id_criador) VALUES (?, ?, ?)";
-        $stmt_comunidade = mysqli_prepare($conn, $sql_comunidade);
-        mysqli_stmt_bind_param($stmt_comunidade, "ssi", $nome, $descricao, $userId);
+        
+        // =======================================================================
+        // 💥 CORREÇÃO 1: VERIFICA SE O NOME JÁ EXISTE 💥
+        // =======================================================================
+        $sql_verificar = "SELECT id FROM comunidades WHERE nome_comunidade = ?";
+        $stmt_verificar = mysqli_prepare($conn, $sql_verificar);
+        
+        if ($stmt_verificar) {
+            mysqli_stmt_bind_param($stmt_verificar, "s", $nome_comunidade);
+            mysqli_stmt_execute($stmt_verificar);
+            mysqli_stmt_store_result($stmt_verificar);
 
-        if (mysqli_stmt_execute($stmt_comunidade)) {
-            $nova_comunidade_id = mysqli_insert_id($conn);
+            if (mysqli_stmt_num_rows($stmt_verificar) > 0) {
+                $error_message = "Erro: Já existe uma comunidade com o nome '{$nome_comunidade}'. Por favor, escolha outro nome.";
+                mysqli_stmt_close($stmt_verificar);
+            } else {
+                mysqli_stmt_close($stmt_verificar);
+                
+                // =======================================================================
+                // CORREÇÃO 2: INSERÇÃO DA COMUNIDADE (Linhas originais corrigidas)
+                // =======================================================================
+                $sql_insert = "INSERT INTO comunidades (nome_comunidade, descricao, id_criador) VALUES (?, ?, ?)";
+                
+                $stmt_insert = mysqli_prepare($conn, $sql_insert);
+                
+                if ($stmt_insert === false) {
+                     $error_message = "Erro ao preparar a consulta de inserção: " . mysqli_error($conn);
+                } else {
+                    // Aqui está a linha 38 ou próxima, que antes falhava na execução
+                    mysqli_stmt_bind_param($stmt_insert, "ssi", $nome_comunidade, $descricao, $userId);
 
-            // 2. Inserir o criador como o primeiro membro na tabela 'membros_comunidade'
-            $sql_membro = "INSERT INTO membros_comunidade (id_comunidade, id_usuario) VALUES (?, ?)";
-            $stmt_membro = mysqli_prepare($conn, $sql_membro);
-            mysqli_stmt_bind_param($stmt_membro, "ii", $nova_comunidade_id, $userId);
-            mysqli_stmt_execute($stmt_membro);
-            mysqli_stmt_close($stmt_membro);
+                    if (mysqli_stmt_execute($stmt_insert)) {
+                        $new_community_id = mysqli_insert_id($conn);
+                        
+                        // 💥 RESTAURADO: Adicionar o criador como membro e admin (is_admin = 1)
+                        $sql_membro = "INSERT INTO membros_comunidade (id_comunidade, id_usuario, is_admin) VALUES (?, ?, 1)";
+                        $stmt_membro = mysqli_prepare($conn, $sql_membro);
+                        mysqli_stmt_bind_param($stmt_membro, "ii", $new_community_id, $userId);
+                        
+                        if (mysqli_stmt_execute($stmt_membro)) { // Linha 58 (ou próxima)
+                            mysqli_stmt_close($stmt_membro);
+                            
+                            $success_message = "Comunidade '{$nome_comunidade}' criada com sucesso! Você foi adicionado como membro e administrador.";
+                            
+                            // Redirecionamento após sucesso para limpar o POST
+                            header("Location: criar_comunidade.php?success=1&name=" . urlencode($nome_comunidade));
+                            exit;
+                        } 
+                        // ...
 
-            $mensagem = "Comunidade '$nome' criada e você já é um membro!";
-            // Redireciona após o sucesso para evitar reenvio do formulário
-            header("Location: homePage.php?msg=" . urlencode($mensagem));
-            exit;
+                    } else {
+                        // Isso só deve ocorrer se houver um erro de DB diferente da duplicidade
+                        $error_message = "Erro ao finalizar a criação da comunidade: " . mysqli_error($conn);
+                    }
+                    mysqli_stmt_close($stmt_insert);
+                }
+            }
         } else {
-            $erro = "Erro ao criar comunidade: " . mysqli_error($conn);
+            $error_message = "Erro ao preparar a consulta de verificação: " . mysqli_error($conn);
         }
-        mysqli_stmt_close($stmt_comunidade);
     }
 }
+
+// =======================================================================
+// LÓGICA PARA EXIBIR MENSAGEM DE SUCESSO APÓS REDIRECIONAMENTO (GET Request)
+// =======================================================================
+if (isset($_GET['success']) && $_GET['success'] == 1 && isset($_GET['name'])) {
+    $nome_comunidade_sucesso = htmlspecialchars(urldecode($_GET['name']));
+    $success_message = "Comunidade '{$nome_comunidade_sucesso}' criada com sucesso! Você foi adicionado como membro e administrador.";
+}
 ?>
+
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Criar Comunidade | NeuroBlogs</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="homePage.css"> <style>
-        .main-content {
-            padding-left: 5rem; /* Espaço para o menu lateral fixo */
-            padding-top: 20px;
-            max-width: 800px;
-            margin: 0 auto; /* Centraliza o conteúdo principal */
-        }
-        .form-card {
-            background-color: var(--color-card-background, #fff);
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-    </style>
-    </head>
+    <title>Criar Comunidade</title>
+    <link rel="stylesheet" href="style.css"> 
+</head>
 <body>
-    <?php include 'menu_navegacao.php'; // Inclua seu menu lateral aqui, se existir ?>
+    <?php // include "menu_navegacao.php"; ?> 
+    <main class="main-content-single">
+        <h2>Criar Nova Comunidade</h2>
+        
+        <?php if (!empty($success_message)): ?>
+            <div class="alert success"><?= $success_message ?></div>
+        <?php endif; ?>
+        
+        <?php if (!empty($error_message)): ?>
+            <div class="alert error"><?= htmlspecialchars($error_message) ?></div>
+        <?php endif; ?>
 
-    <div class="main-content">
-        <div class="form-card">
-            <h2 class="mb-4"><i class="fas fa-users"></i> Criar Nova Comunidade</h2>
+        <form method="POST" action="criar_comunidade.php" class="form-card">
+            <div class="form-group">
+                <label for="nome_comunidade">Nome da Comunidade:</label>
+                <input type="text" id="nome_comunidade" name="nome_comunidade" required value="<?= htmlspecialchars($nome_comunidade ?? '') ?>"> 
+            </div>
             
-            <?php if ($erro): ?>
-                <div class="alert alert-danger" role="alert"><?= $erro ?></div>
-            <?php endif; ?>
-            
-            <form method="POST">
-                <div class="mb-3">
-                    <label for="nome_comunidade" class="form-label">Nome da Comunidade</label>
-                    <input type="text" class="form-control" id="nome_comunidade" name="nome_comunidade" required maxlength="100" value="<?= $_POST['nome_comunidade'] ?? '' ?>">
-                </div>
-                <div class="mb-3">
-                    <label for="descricao_comunidade" class="form-label">Descrição</label>
-                    <textarea class="form-control" id="descricao_comunidade" name="descricao_comunidade" rows="5" required><?= $_POST['descricao_comunidade'] ?? '' ?></textarea>
-                    <div class="form-text">Descreva o objetivo e as regras da sua comunidade.</div>
-                </div>
-                
-                <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Criar Comunidade</button>
-            </form>
-        </div>
-    </div>
+            <div class="form-group">
+                <label for="descricao">Descrição (Opcional):</label>
+                <textarea id="descricao" name="descricao" rows="5"><?= htmlspecialchars($descricao ?? '') ?></textarea>
+            </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script> lucide.createIcons(); </script>
+            <button type="submit" class="btn-full">Criar Comunidade</button>
+        </form>
+    </main>
 </body>
 </html>

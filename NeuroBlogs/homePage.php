@@ -1,11 +1,11 @@
 <?php
-// PHP - Arquivo: homePage.php (Versão Final com Acessibilidade e Comunidades)
+// PHP - Arquivo: homePage.php (Layout de Duas Colunas Restaurado com Funcionalidades)
 session_start();
 
 // Define o fuso horário para o de São Paulo (UTC-3)
 date_default_timezone_set('America/Sao_Paulo');
 
-include "conexao.php"; // Certifique-se de que este caminho está correto
+include "conexao.php"; 
 
 if (!isset($conn) || $conn->connect_error) {
     die("Erro fatal: A conexão com o banco de dados não pôde ser estabelecida. Verifique o arquivo 'conexao.php' e as credenciais. Erro: " . (isset($conn) ? $conn->connect_error : 'Variável $conn não definida.'));
@@ -25,81 +25,355 @@ if (!isset($_SESSION["usuario"])) {
 $userName = $_SESSION["usuario"];
 $userId = $_SESSION['usuario_id'];
 
+// --- Função para Redimensionar e Otimizar Imagens ---
+// [Manter o conteúdo completo da função resizeImage aqui]
+function resizeImage($file, $maxWidth = 800, $maxHeight = 600) {
+    $info = getimagesize($file);
+    if ($info === false) { return false; }
+    list($originalWidth, $originalHeight) = $info;
+    $mime = $info['mime'];
+
+    if ($originalWidth <= $maxWidth) { $width = $originalWidth; $height = $originalHeight; } 
+    else { $ratio = $maxWidth / $originalWidth; $width = $maxWidth; $height = $originalHeight * $ratio; }
+    
+    if ($height > $maxHeight) { $ratio = $maxHeight / $originalHeight; $height = $maxHeight; $width = $originalWidth * $ratio; }
+    
+    $image = imagecreatetruecolor($width, $height);
+
+    if ($mime == 'image/jpeg' || $mime == 'image/jpg') { $source = imagecreatefromjpeg($file); } 
+    elseif ($mime == 'image/png') { $source = imagecreatefrompng($file); } 
+    elseif ($mime == 'image/gif') { $source = imagecreatefromgif($file); } 
+    else { return false; }
+
+    imagecopyresampled($image, $source, 0, 0, 0, 0, $width, $height, $originalWidth, $originalHeight);
+    
+    $temp_path = tempnam(sys_get_temp_dir(), 'img');
+    imagejpeg($image, $temp_path, 90); 
+    imagedestroy($image);
+    imagedestroy($source);
+
+    return $temp_path;
+}
+
+
 // --- 1. BUSCAR PREFERÊNCIAS DE ACESSIBILIDADE ---
-// Esta busca é necessária para que os elementos HTML (como o botão de config) possam ter informações úteis.
 $sql_prefs = "SELECT cor_fundo_pref, cor_texto_pref, tamanho_fonte_pref, fonte_preferida FROM perfil_usuario WHERE id = $userId";
 $result_prefs = mysqli_query($conn, $sql_prefs);
 $prefs_atuais = mysqli_fetch_assoc($result_prefs) ?? [];
 
-$current_fundo = $prefs_atuais['cor_fundo_pref'] ?? '#f5f5f5';
-$current_texto = $prefs_atuais['cor_texto_pref'] ?? '#2c3e50';
-$current_tamanho = $prefs_atuais['tamanho_fonte_pref'] ?? 'medium';
-$current_fonte = $prefs_atuais['fonte_preferida'] ?? 'sans-serif';
+
+// --- 2. LÓGICA DE POST/LIKE/COMMENT (POST Request) ---
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (isset($_POST['action'])) {
+        $action = $_POST['action'];
+
+        // Lógica de Postar Nova Mensagem
+        if ($action == 'post' && isset($_POST['conteudo'])) {
+            $conteudo = trim($_POST['conteudo']);
+            // O campo 'id_comunidade' agora aceita 'NULL' se for uma postagem pessoal
+            $id_comunidade = empty($_POST['id_comunidade']) ? NULL : (int)$_POST['id_comunidade'];
+            $imagem_post = NULL;
+
+            if (empty($conteudo) && empty($_FILES['imagem_post']['tmp_name'])) {
+                // Não faz nada se a postagem estiver vazia
+            } else {
+                if (isset($_FILES['imagem_post']) && $_FILES['imagem_post']['error'] == 0) {
+                    $upload_dir = 'uploads/posts/';
+                    if (!is_dir($upload_dir)) { mkdir($upload_dir, 0777, true); }
+                    
+                    $temp_file = $_FILES['imagem_post']['tmp_name'];
+                    $original_name = $_FILES['imagem_post']['name'];
+                    $ext = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
+                    $new_filename = uniqid('post_') . '.' . $ext;
+                    $target_file = $upload_dir . $new_filename;
+
+                    $optimized_temp_path = resizeImage($temp_file);
+
+                    if ($optimized_temp_path && move_uploaded_file($optimized_temp_path, $target_file)) {
+                        $imagem_post = $target_file;
+                    } elseif ($optimized_temp_path) {
+                        if (rename($optimized_temp_path, $target_file)) {
+                            $imagem_post = $target_file;
+                        } else {
+                            if (move_uploaded_file($temp_file, $target_file)) {
+                                $imagem_post = $target_file;
+                            }
+                        }
+                    } else {
+                        if (move_uploaded_file($temp_file, $target_file)) {
+                            $imagem_post = $target_file;
+                        }
+                    }
+                }
+                
+                // Usando bind_param para lidar com o NULL na comunidade
+                $sql = "INSERT INTO postagens (usuario_id, conteudo, imagem_path, id_comunidade) VALUES (?, ?, ?, ?)";
+                $stmt = mysqli_prepare($conn, $sql);
+                
+                // Tipo de parâmetro ajustado para 's' se id_comunidade for NULL
+                if ($id_comunidade === NULL) {
+                    $null_param = NULL;
+                    mysqli_stmt_bind_param($stmt, "issb", $userId, $conteudo, $imagem_post, $null_param);
+                } else {
+                    mysqli_stmt_bind_param($stmt, "issi", $userId, $conteudo, $imagem_post, $id_comunidade);
+                }
+
+                mysqli_stmt_execute($stmt);
+                mysqli_stmt_close($stmt);
+
+                header("Location: homePage.php");
+                exit;
+            }
+        }
+        
+        // Lógica de Curtir (AJAX) - MANTIDA
+        if ($action == 'like' && isset($_POST['post_id'])) {
+            $postId = (int)$_POST['post_id'];
+            
+            $sql_check = "SELECT id FROM curtidas WHERE id_postagem = ? AND id_usuario = ?";
+            $stmt_check = mysqli_prepare($conn, $sql_check);
+            mysqli_stmt_bind_param($stmt_check, "ii", $postId, $userId);
+            mysqli_stmt_execute($stmt_check);
+            mysqli_stmt_store_result($stmt_check);
+            
+            $json_response = ['success' => false, 'is_liked' => false, 'likes_count' => 0];
+
+            if (mysqli_stmt_num_rows($stmt_check) > 0) {
+                // DESCURTE
+                $sql_action = "DELETE FROM curtidas WHERE id_postagem = ? AND id_usuario = ?";
+                $is_liked = false;
+            } else {
+                // CURTE
+                $sql_action = "INSERT INTO curtidas (id_postagem, id_usuario) VALUES (?, ?)";
+                $is_liked = true;
+            }
+            mysqli_stmt_close($stmt_check);
+
+            $stmt_action = mysqli_prepare($conn, $sql_action);
+            mysqli_stmt_bind_param($stmt_action, "ii", $postId, $userId);
+            mysqli_stmt_execute($stmt_action);
+            mysqli_stmt_close($stmt_action);
+
+            // Obtém o novo total de curtidas
+            $sql_count = "SELECT COUNT(id) as total_likes FROM curtidas WHERE id_postagem = ?";
+            $stmt_count = mysqli_prepare($conn, $sql_count);
+            mysqli_stmt_bind_param($stmt_count, "i", $postId);
+            mysqli_stmt_execute($stmt_count);
+            $result_count = mysqli_stmt_get_result($stmt_count);
+            $total_likes = mysqli_fetch_assoc($result_count)['total_likes'];
+            mysqli_stmt_close($stmt_count);
+
+            $json_response['success'] = true;
+            $json_response['is_liked'] = $is_liked;
+            $json_response['likes_count'] = $total_likes;
+            
+            header('Content-Type: application/json');
+            echo json_encode($json_response);
+            exit;
+        }
+
+        // Lógica de Comentar (AJAX) - MANTIDA
+        if ($action == 'comment' && isset($_POST['post_id']) && isset($_POST['comment_text'])) {
+            $postId = (int)$_POST['post_id'];
+            $commentText = trim($_POST['comment_text']);
+
+            $json_response = ['success' => false];
+
+            if (!empty($commentText)) {
+                $sql = "INSERT INTO comentarios (id_postagem, id_usuario, conteudo) VALUES (?, ?, ?)";
+                $stmt = mysqli_prepare($conn, $sql);
+                mysqli_stmt_bind_param($stmt, "iis", $postId, $userId, $commentText);
+                
+                if (mysqli_stmt_execute($stmt)) {
+                    $json_response['success'] = true;
+                    // Montar o HTML do novo comentário para inserção via AJAX
+                    $json_response['new_comment_html'] = "
+                        <div class='comment'>
+                            <p><strong>" . htmlspecialchars($userName) . ":</strong> " . nl2br(htmlspecialchars($commentText)) . "</p>
+                            <span class='comment-time'>Agora</span>
+                        </div>
+                    ";
+                }
+                mysqli_stmt_close($stmt);
+            }
+
+            header('Content-Type: application/json');
+            echo json_encode($json_response);
+            exit;
+        }
+    }
+}
 
 
-// --- 2. LÓGICA DE POSTAGEM / COMENTÁRIOS (POST Request) ---
-// ... Mantenha sua lógica de POST aqui (postagem e comentários) ...
-// (Para manter a resposta concisa, assumimos que sua lógica de POST existente está aqui)
+// --- 3. COMUNIDADES: Busca Comunidades do Usuário ---
+$comunidades_usuario = [];
+// Buscamos SOMENTE as comunidades que o usuário é MEMBRO para a lista de filtros e o SELECT de postagem
+$sql_comunidades_usuario = "
+    SELECT c.id, c.nome_comunidade AS nome 
+    FROM comunidades c
+    JOIN membros_comunidade mc ON c.id = mc.id_comunidade
+    WHERE mc.id_usuario = ?
+    ORDER BY c.nome_comunidade ASC
+";
+$stmt_comunidades = mysqli_prepare($conn, $sql_comunidades_usuario);
+if ($stmt_comunidades) {
+    mysqli_stmt_bind_param($stmt_comunidades, "i", $userId);
+    mysqli_stmt_execute($stmt_comunidades);
+    $result_comunidades = mysqli_stmt_get_result($stmt_comunidades);
+    $comunidades_usuario = mysqli_fetch_all($result_comunidades, MYSQLI_ASSOC);
+    mysqli_stmt_close($stmt_comunidades);
+}
 
-// --- 3. LÓGICA DO FEED (GET Request) ---
+// --- 4. LÓGICA DE FILTRO (GET Request) ---
+$view_mode = $_GET['view_mode'] ?? 'all'; 
+$page = $_GET['page'] ?? 1;
+$limit = 10;
+$offset = ($page - 1) * $limit;
 
-// Define o modo de visualização padrão
-// homePage.php - Linhas ~75 a 85 (CÓDIGO CORRIGIDO)
-// --- 3. LÓGICA DO FEED (GET Request) ---
 
-// Define o modo de visualização padrão
-// homePage.php - Linhas ~75 a 85 (CÓDIGO CORRIGIDO)
-// --- 3. LÓGICA DO FEED (GET Request) ---
-
-// Define o modo de visualização padrão
-$view_mode = $_GET['view'] ?? 'friends'; // 'friends' ou 'communities'
-
-// 3.1. Consulta Base
-// Seleciona todos os dados de postagens e junta com usuários (para apelido),
-// perfil_usuario (para a foto) e o nome da comunidade.
-
+// --- 5. LÓGICA DO FEED: Consulta Principal ---
 $sql_select_posts = "
     SELECT 
         p.*, 
         u.apelido AS nome_usuario, 
-        pu.foto_perfil AS foto_usuario,  
-        c.nome_comunidade
+        pu.foto AS foto_usuario,  
+        c.nome_comunidade AS nome_comunidade,
+        COUNT(l.id) AS total_curtidas,
+        (SELECT COUNT(id) FROM comentarios WHERE id_postagem = p.id) AS total_comentarios,
+        (SELECT COUNT(id) FROM curtidas WHERE id_postagem = p.id AND id_usuario = ?) AS curtiu_usuario
     FROM postagens p
     JOIN usuarios u ON p.usuario_id = u.id
-    JOIN perfil_usuario pu ON u.id = pu.id   -- Join para buscar a foto na tabela perfil_usuario (pu)
+    LEFT JOIN perfil_usuario pu ON u.id = pu.id 
     LEFT JOIN comunidades c ON p.id_comunidade = c.id
+    LEFT JOIN curtidas l ON p.id = l.id_postagem
 ";
 
-$where_clause = "WHERE 1=1"; // Cláusula inicial sempre verdadeira
-// ... (O restante da lógica de $where_clause permanece o mesmo)
+$where_clause = "WHERE 1=1"; 
+$bind_types = "i";
+$bind_params = [$userId];
 
-if ($view_mode == 'friends') {
-    // Modo Amigos: Mostra posts de amigos E posts pessoais (id_usuario = $userId)
-    // Para simplificar, vou considerar que todos os usuários são "amigos" no momento, 
-    // mas você pode adicionar a lógica de "amigos" aqui.
-    // Por enquanto, mostramos posts de todos os usuários que não estão em uma comunidade
-    // OU posts pessoais.
-    $where_clause .= " 
-        AND (p.id_comunidade IS NULL OR p.usuario_id = $userId)
-    ";
+// Filtro: Apenas posts de comunidades que o usuário segue
+if ($view_mode == 'following' && !empty($comunidades_usuario)) {
+    $comunidade_ids = array_column($comunidades_usuario, 'id');
+    $ids_placeholder = implode(',', array_fill(0, count($comunidade_ids), '?'));
+    
+    // Filtra posts que têm um id_comunidade E esse ID está na lista de IDs que o usuário segue
+    $where_clause .= " AND p.id_comunidade IS NOT NULL AND p.id_comunidade IN ({$ids_placeholder})";
+    
+    $bind_types .= str_repeat('i', count($comunidade_ids));
+    $bind_params = array_merge($bind_params, $comunidade_ids);
 
-} elseif ($view_mode == 'communities') {
-    // Modo Comunidades: Mostra posts de comunidades que o usuário é membro.
-    $where_clause .= " 
-        AND p.id_comunidade IN (
-            SELECT id_comunidade FROM membros_comunidade WHERE id_usuario = $userId
-        )
-    ";
+// Filtro: Apenas posts pessoais (não ligados a nenhuma comunidade)
+} elseif ($view_mode == 'friends') {
+    $where_clause .= " AND p.id_comunidade IS NULL";
+    
+// Filtro: Todos os posts (pessoal + comunidades que o usuário segue)
+} elseif ($view_mode == 'all' && !empty($comunidades_usuario)) {
+    $comunidade_ids = array_column($comunidades_usuario, 'id');
+    $ids_placeholder = implode(',', array_fill(0, count($comunidade_ids), '?'));
+    
+    // Inclui posts pessoais (id_comunidade IS NULL) OU posts de comunidades que o usuário segue
+    $where_clause .= " AND (p.id_comunidade IS NULL OR p.id_comunidade IN ({$ids_placeholder}))";
+    
+    $bind_types .= str_repeat('i', count($comunidade_ids));
+    $bind_params = array_merge($bind_params, $comunidade_ids);
 }
 
-$sql_select_posts .= " $where_clause ORDER BY p.data_criacao DESC LIMIT 50"; // Limite de 50 posts
-$result_posts = mysqli_query($conn, $sql_select_posts);
+
+$sql_select_posts .= " 
+    {$where_clause}
+    GROUP BY p.id
+    ORDER BY p.data_criacao DESC
+    LIMIT ? OFFSET ?
+";
+
+$bind_types .= "ii";
+$bind_params[] = $limit;
+$bind_params[] = $offset;
 
 
-// --- 4. FUNÇÕES DE RENDERIZAÇÃO ---
-// ... Mantenha suas funções `getCommentsForPost` e `renderPost` aqui ...
-// (Para manter a resposta concisa, assumimos que suas funções de renderização estão aqui)
+$stmt_posts = mysqli_prepare($conn, $sql_select_posts);
 
+if ($stmt_posts) {
+    mysqli_stmt_bind_param($stmt_posts, $bind_types, ...$bind_params);
+    mysqli_stmt_execute($stmt_posts);
+    $result_posts = mysqli_stmt_get_result($stmt_posts);
+}
+
+
+// --- 6. FUNÇÕES AUXILIARES ---
+function display_post_card($post) {
+    global $userId;
+    // Esta função foi mantida igual para manter a funcionalidade do post card
+    $time_ago = time_ago($post['data_criacao']); 
+    $is_liked = $post['curtiu_usuario'] > 0;
+    $profile_link = "perfil.php?id=" . $post['usuario_id'];
+    $comunidade_html = '';
+    if (!empty($post['nome_comunidade'])) {
+        $comunidade_html = "<span class='post-community'> em <a href='comunidade.php?id={$post['id_comunidade']}'>" . htmlspecialchars($post['nome_comunidade']) . "</a></span>";
+    }
+
+    $like_class = $is_liked ? 'liked' : '';
+    $like_icon = $is_liked ? 'fa-solid' : 'fa-regular';
+
+    $foto_perfil = !empty($post['foto_usuario']) ? htmlspecialchars($post['foto_usuario']) : 'default_profile.png';
+    $foto_url = 'uploads/perfil/' . $foto_perfil;
+    
+    $html = "<article class='post-card' data-post-id='{$post['id']}'>
+        <div class='post-header'>
+            <a href='{$profile_link}' class='user-link'>
+                <img src='{$foto_url}' alt='Foto de Perfil' class='profile-photo small'>
+                <strong>" . htmlspecialchars($post['nome_usuario']) . "</strong>
+            </a>
+            <span class='post-time'>{$time_ago} {$comunidade_html}</span>
+        </div>
+
+        <p class='post-text'>" . nl2br(htmlspecialchars($post['conteudo'])) . "</p>";
+
+    if (!empty($post['imagem_path'])) {
+        $html .= "<div class='post-image-wrapper'><img src='" . htmlspecialchars($post['imagem_path']) . "' alt='Imagem do post' class='post-image'></div>";
+    }
+
+    $html .= "
+        <div class='post-footer'>
+            <div class='post-actions'>
+                <button class='btn-like {$like_class}' data-post-id='{$post['id']}'>
+                    <i class='{$like_icon} fa-heart'></i>
+                    <span class='likes-count'>{$post['total_curtidas']}</span> Curtidas
+                </button>
+                <button class='btn-comment' data-post-id='{$post['id']}'>
+                    <i class='fa-regular fa-comment'></i>
+                    <span class='comments-count'>{$post['total_comentarios']}</span> Comentários
+                </button>
+            </div>
+            
+            <div class='comments-section' id='comments-{$post['id']}'>
+                <form class='comment-form' data-post-id='{$post['id']}'>
+                    <input type='text' placeholder='Escreva um comentário...' required>
+                    <button type='submit' class='btn-comment-submit'><i class='fa-solid fa-paper-plane'></i></button>
+                </form>
+
+                <div class='comments-list' id='comments-list-{$post['id']}'>
+                </div>
+            </div>
+        </div>
+    </article>";
+    return $html;
+}
+
+function time_ago($datetime) {
+    $tempo = time() - strtotime($datetime); 
+    if ($tempo < 60) return "agora";
+    $minutos = floor($tempo / 60);
+    if ($minutos < 60) return "há {$minutos} min";
+    $horas = floor($minutos / 60);
+    if ($horas < 24) return "há {$horas} h";
+    $dias = floor($horas / 24);
+    if ($dias < 30) return "há {$dias} d";
+    return date('d/m/Y', strtotime($datetime));
+}
+
+// Fim da Lógica PHP
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -107,165 +381,160 @@ $result_posts = mysqli_query($conn, $sql_select_posts);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NeuroBlogs - Feed</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    
     <link rel="stylesheet" href="homePage.css">
-
-    <link rel="stylesheet" href="css/user_preferences.php?user_id=<?= $userId ?>">
-    
-    </head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script src="https://unpkg.com/lucide@latest"></script> 
+    <link rel="stylesheet" href="user_preferences.php?user_id=<?= $userId ?>" type="text/css">
+</head>
 <body>
 
-    <nav class="navigation">
-        <ul>
-            <li><a href="homePage.php?view=friends" title="Feed de Amigos"><i class="fa-solid fa-house"></i></a></li>
-            <li><a href="homePage.php?view=communities" title="Feed de Comunidades"><i class="fa-solid fa-users"></i></a></li>
-            <li><a href="perfil.php?id=<?= $userId ?>" title="Meu Perfil"><i class="fa-solid fa-user"></i></a></li>
-            <li><a href="config_acessibilidade.php" title="Configurações de Acessibilidade"><i class="fa-solid fa-universal-access"></i></a></li>
-            <li><a href="logout.php" title="Sair"><i class="fa-solid fa-right-from-bracket"></i></a></li>
-        </ul>
-    </nav>
+    <?php include "menu_navegacao.php"; ?> 
 
-    <div class="main-content">
+    <div class="main-content-wrapper-two-col"> 
         
-        <div class="posts-col">
-
-            <section class="new-post-form">
-                <h2>O que você está pensando, <?= htmlspecialchars($userName) ?>?</h2>
-                <form id="post-form" action="homePage.php" method="POST" enctype="multipart/form-data">
-                    <textarea name="conteudo" placeholder="Compartilhe seu blog, pensamento ou experiência..." required></textarea>
+        <main class="feed-main-col"> 
+            
+            <section class="new-post-form card">
+                <form action="homePage.php" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="post">
                     
-                    <select name="id_comunidade" class="community-select">
-                        <option value="">Postar no Meu Feed Pessoal</option>
-                        <?php
-                            $sql_com = "SELECT c.id, c.nome_comunidade FROM comunidades c JOIN membros_comunidade m ON c.id = m.id_comunidade WHERE m.id_usuario = ?";
-                            $stmt_com = mysqli_prepare($conn, $sql_com);
-                            mysqli_stmt_bind_param($stmt_com, "i", $userId);
-                            mysqli_stmt_execute($stmt_com);
-                            $result_com = mysqli_stmt_get_result($stmt_com);
-                            while ($com = mysqli_fetch_assoc($result_com)) {
-                                echo "<option value=\"{$com['id']}\">Comunidade: " . htmlspecialchars($com['nome_comunidade']) . "</option>";
+                    <div class="form-header">
+                        <h3 class="form-title">O que você está pensando, <?= htmlspecialchars($userName) ?>?</h3>
+                        <select name="id_comunidade" class="community-select" aria-label="Selecione uma comunidade">
+                            <option value="" selected>Postar Pessoalmente</option>
+                            <?php 
+                            if (!empty($comunidades_usuario)) {
+                                foreach ($comunidades_usuario as $comunidade) {
+                                    echo "<option value='{$comunidade['id']}'>" . htmlspecialchars($comunidade['nome']) . "</option>";
+                                }
                             }
-                        ?>
-                    </select>
+                            ?>
+                        </select>
+                    </div>
 
+                    <textarea name="conteudo" rows="3" placeholder="Compartilhe seus pensamentos, ideias ou sentimentos..." class="post-text-area"></textarea>
+                    
                     <div class="post-actions">
                         <label for="imagem_post" class="image-upload-label">
                             <i class="fa-solid fa-image"></i> Adicionar Imagem
                             <input type="file" name="imagem_post" id="imagem_post" accept="image/*" style="display: none;">
                         </label>
-                        <button type="submit" name="postar">Postar</button>
+                        <button type="submit" name="postar" class="btn-full small">Publicar</button>
                     </div>
                 </form>
             </section>
-            
-            <h2 class="feed-title">
-                <?php if ($view_mode == 'friends'): ?>
-                    Feed de Amigos e Pessoal
-                <?php else: ?>
-                    Feed das Comunidades que Você Participa
-                <?php endif; ?>
-            </h2>
 
-            <section class="feed-posts">
-                <?php
-                if (mysqli_num_rows($result_posts) > 0) {
-                    while($post = mysqli_fetch_assoc($result_posts)) {
-                        // Assume que a sua função renderPost() está definida em algum lugar ou o código está inline
-                        // Aqui está o HTML básico do seu post para referência:
-                        ?>
-                        <div class="post-card" id="post-<?= $post['id'] ?>">
-                            <div class="post-header">
-                                <div class="user-info">
-                                    <img src="<?= htmlspecialchars($post['foto_usuario'] ?? 'imagens/default.png') ?>" alt="Foto de <?= htmlspecialchars($post['nome_usuario']) ?>" class="profile-pic-small">
-                                    <a href="perfil.php?id=<?= $post['usuario_id'] ?>" class="username"><?= htmlspecialchars($post['nome_usuario']) ?></a>
-                                    <?php if ($post['nome_comunidade']): ?>
-                                        <span class="community-tag">| Postado em: <?= htmlspecialchars($post['nome_comunidade']) ?></span>
-                                    <?php endif; ?>
-                                </div>
-                                <span class="post-time"><?= date('H:i, d/m/Y', strtotime($post['data_criacao'])) ?></span>
-                            </div>
-                            
-                            <div class="post-content">
-                                <p class="post-text"><?= nl2br(htmlspecialchars($post['conteudo'])) ?></p>
-                                <?php if (!empty($post['imagem_url'])): ?>
-                                    <img src="<?= htmlspecialchars($post['imagem_url']) ?>" alt="Imagem da Postagem" class="post-image">
-                                <?php endif; ?>
-                            </div>
 
-                            <div class="post-footer">
-                                <button class="like-button" data-post-id="<?= $post['id'] ?>">
-                                    <i class="fa-regular fa-heart"></i> Curtir
-                                </button>
-                                
-                                <span class="likes-count" id="likes-count-<?= $post['id'] ?>">
-                                    </span>
-                            </div>
-
-                            <div class="comments-area">
-                                <h4>Comentários</h4>
-                                <ul class="comments-list" id="comments-list-<?= $post['id'] ?>">
-                                    <?php
-                                    // Sua função de busca de comentários deve ser chamada aqui
-                                    // $comments = getCommentsForPost($conn, $post['id']);
-                                    // foreach ($comments as $comment) { ... render HTML ... }
-                                    ?>
-                                </ul>
-                                
-                                <form class="comment-form" data-post-id="<?= $post['id'] ?>">
-                                    <input type="text" placeholder="Escreva um comentário..." required>
-                                    <button type="submit">Comentar</button>
-                                </form>
-                            </div>
-                        </div>
-                        <?php
+            <section class="feed-container">
+                <?php 
+                if ($result_posts && mysqli_num_rows($result_posts) > 0) {
+                    while ($post = mysqli_fetch_assoc($result_posts)) {
+                        echo display_post_card($post); 
                     }
+                } elseif ($result_posts) {
+                    echo "<div class='no-posts-message card'>Nenhuma postagem encontrada com os filtros atuais.</div>";
                 } else {
-                    echo "<p class='no-posts'>Nenhuma postagem para exibir neste feed ainda.</p>";
+                    echo "<div class='no-posts-message card error-message'>Erro ao carregar as postagens.</div>";
+                }
+                if (isset($stmt_posts)) {
+                    mysqli_stmt_close($stmt_posts);
                 }
                 ?>
             </section>
-        </div>
+        </main> 
 
-        <aside class="right-sidebar">
-            <div class="widget">
-                <h3>🔔 Notificações (Em Breve)</h3>
-                <p>Veja as novidades e interações dos seus posts.</p>
+        <aside class="sidebar-right">
+            <div class="filter-panel card">
+                <h4>Filtros de Visualização</h4>
+                <form action="homePage.php" method="GET" class="filter-form">
+                    <label>
+                        <input type="radio" name="view_mode" value="all" <?= ($view_mode == 'all') ? 'checked' : '' ?>> 
+                        Todas as Publicações (Comunidades + Pessoal)
+                    </label>
+                    <label>
+                        <input type="radio" name="view_mode" value="following" <?= ($view_mode == 'following') ? 'checked' : '' ?>> 
+                        Apenas Comunidades que Sigo
+                    </label>
+                    <label>
+                        <input type="radio" name="view_mode" value="friends" <?= ($view_mode == 'friends') ? 'checked' : '' ?>> 
+                        Apenas Posts Pessoais
+                    </label>
+                    <button type="submit" class="btn-full small mt-3">Aplicar Filtro</button>
+                </form>
             </div>
             
-            <div class="widget">
-                <h3>➕ Crie uma Comunidade</h3>
-                <a href="criar_comunidade.php" class="btn-full">Criar Novo Grupo</a>
-            </div>
-            
-            <div class="widget">
-                <h3>🌎 Explorar Comunidades</h3>
-                <p>Encontre grupos sobre seus interesses neurodiversos.</p>
-                <a href="explorar_comunidades.php" class="btn-full secondary">Ver Todas</a>
-            </div>
-            
-             <div class="widget accessibility-summary">
-                <h3>Acessibilidade Ativa</h3>
-                <p>Ajustes Rápidos:</p>
-                <ul>
-                    <li>Fundo: <span style="color: <?= $current_fundo ?>; background-color: <?= $current_texto ?>; padding: 2px 5px;">Cor Personalizada</span></li>
-                    <li>Texto: <span style="color: <?= $current_texto ?>; font-weight: bold;">Contraste Alto</span></li>
-                    <li>Fonte: <span style="font-size: <?= $current_tamanho == 'small' ? '12px' : ($current_tamanho == 'large' ? '18px' : '16px') ?>; font-family: <?= $current_fonte ?>;">Tipo Preferido</span></li>
+            <div class="suggestions-panel card mt-4">
+                <h4>Comunidades</h4>
+                <p class="mb-3">Encontre espaços de interesse, dúvidas e experiências compartilhadas.</p>
+                <a href="comunidades.php" class="btn-full small">Ver Todas as Comunidades</a>
+                
+                <h5 class="mt-4">Minhas Comunidades (<?= count($comunidades_usuario) ?>)</h5>
+                <ul class="suggestion-list">
+                    <?php 
+                    if (!empty($comunidades_usuario)) {
+                        foreach ($comunidades_usuario as $comunidade) {
+                            echo "<li><a href='comunidade.php?id={$comunidade['id']}'>" . htmlspecialchars($comunidade['nome']) . "</a></li>";
+                        }
+                    } else {
+                        echo "<li><small>Você ainda não faz parte de nenhuma comunidade.</small></li>";
+                    }
+                    ?>
                 </ul>
-                <a href="config_acessibilidade.php" class="btn-full small">Mudar Configurações</a>
+                <a href="criar_comunidade.php" class="btn-full small mt-3 btn-secondary">Criar Nova Comunidade</a>
             </div>
-
         </aside>
 
-    </div> <script>
+    </div> 
+    <script>
+        // Inicializa os ícones do Lucide
+        lucide.createIcons();
+
         document.addEventListener('DOMContentLoaded', function() {
-            // ... (Seus scripts de like, AJAX de postagem, etc. devem estar aqui) ...
-            
-            // Exemplo de script de comentário (adaptado do seu snippet anterior)
+            // Lógica de Curtir (AJAX) - MANTIDA
+            document.querySelectorAll('.btn-like').forEach(button => {
+                button.addEventListener('click', function() {
+                    const postId = this.getAttribute('data-post-id');
+                    const isLiked = this.classList.contains('liked');
+                    const icon = this.querySelector('i');
+                    const countSpan = this.querySelector('.likes-count');
+
+                    const formData = new FormData();
+                    formData.append('action', 'like');
+                    formData.append('post_id', postId);
+
+                    fetch('homePage.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            countSpan.textContent = data.likes_count;
+                            if (data.is_liked) {
+                                button.classList.add('liked');
+                                icon.classList.remove('fa-regular');
+                                icon.classList.add('fa-solid');
+                            } else {
+                                button.classList.remove('liked');
+                                icon.classList.remove('fa-solid');
+                                icon.classList.add('fa-regular');
+                            }
+                        } else {
+                            alert('Erro ao processar a curtida.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro de rede/AJAX na curtida:', error);
+                        alert('Erro de conexão ao curtir.');
+                    });
+                });
+            });
+
+            // Lógica de Comentário (AJAX) - MANTIDA
             document.querySelectorAll('.comment-form').forEach(form => {
                 form.addEventListener('submit', function(e) {
                     e.preventDefault();
-                    const postId = this.getAttribute('data-post-id');
+                    const postId = this.closest('.post-card').getAttribute('data-post-id');
                     const commentInput = this.querySelector('input[type="text"]');
                     const commentText = commentInput.value.trim();
 
@@ -283,8 +552,19 @@ $result_posts = mysqli_query($conn, $sql_select_posts);
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            // ... (Lógica de inserção de comentário) ...
-                            commentInput.value = ''; // Limpa o campo
+                            const commentsList = document.getElementById(`comments-list-${postId}`);
+                            const noCommentsMessage = document.getElementById(`no-comments-message-${postId}`);
+                            
+                            if (noCommentsMessage) {
+                                noCommentsMessage.remove();
+                            }
+                            
+                            commentsList.insertAdjacentHTML('beforeend', data.new_comment_html);
+                            // Atualiza a contagem de comentários no botão
+                            const commentsCountSpan = document.querySelector(`.btn-comment[data-post-id="${postId}"] .comments-count`);
+                            commentsCountSpan.textContent = parseInt(commentsCountSpan.textContent) + 1;
+
+                            commentInput.value = ''; 
                         } else {
                             alert('Erro ao publicar o comentário. Tente novamente.');
                         }
@@ -294,6 +574,33 @@ $result_posts = mysqli_query($conn, $sql_select_posts);
                         alert('Erro de conexão ao publicar o comentário.');
                     });
                 });
+            });
+            
+            // Lógica para Abrir/Fechar Comentários - MANTIDA
+            document.querySelectorAll('.btn-comment').forEach(button => {
+                button.addEventListener('click', function() {
+                    const postId = this.getAttribute('data-post-id');
+                    const commentsSection = document.getElementById(`comments-${postId}`);
+                    commentsSection.classList.toggle('active'); 
+                });
+            });
+            
+            // Lógica para previsualizar a imagem antes do upload
+            document.getElementById('imagem_post').addEventListener('change', function(e) {
+                const previewContainer = document.querySelector('.post-image-preview-wrapper');
+                const file = e.target.files[0];
+                
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        let previewHtml = `<div class="post-image-preview-wrapper"><img src="${e.target.result}" alt="Pré-visualização da imagem" class="post-image-preview"></div>`;
+                        // Insere a pré-visualização após a textarea. Se for um layout antigo, pode ser um local diferente
+                        document.querySelector('.post-text-area').insertAdjacentHTML('afterend', previewHtml);
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    if(previewContainer) previewContainer.remove();
+                }
             });
 
         });
