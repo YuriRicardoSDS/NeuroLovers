@@ -150,6 +150,33 @@ mysqli_stmt_close($stmt_fetch);
             border-bottom: 1px solid #eee;
             padding-bottom: 20px;
         }
+        
+        /* -------------------------------------- */
+        /* 📌 NOVOS ESTILOS PARA O BOTÃO VOLTAR */
+        /* -------------------------------------- */
+        .profile-top-bar {
+            display: flex; 
+            justify-content: flex-start;
+            margin-bottom: 20px; 
+            padding-top: 5px; /* Adiciona um pequeno padding superior */
+        }
+        .btn-back-link {
+            /* Remove o estilo de botão para que pareça um link */
+            background-color: transparent !important;
+            color: #2879e4; /* Cor para links */
+            padding: 0; 
+            border: none;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+        .btn-back-link:hover {
+            opacity: 0.8;
+            background-color: transparent !important;
+        }
+        /* -------------------------------------- */
+        
         .profile-photo-wrapper {
             position: relative;
             width: 150px;
@@ -263,6 +290,12 @@ mysqli_stmt_close($stmt_fetch);
 <body>
     <main class="main-content-single">
         <div class="profile-container">
+            
+            <div class="profile-top-bar">
+                <a href="perfil.php" class="btn-back-link" title="Voltar para o seu Perfil">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+            </div>
             <div class="profile-header">
                 <h1>Editar Perfil de <?= htmlspecialchars($userName) ?></h1>
                 <p style="color: #666;">Altere sua foto e biografia (apenas você vê esta tela).</p>

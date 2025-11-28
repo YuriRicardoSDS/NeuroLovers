@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST'){
 
                 $sql_perfil = "
                     INSERT INTO perfil_usuario 
-                    (id, bio, foto, cor_fundo_pref, cor_texto_pref, tamanho_fonte_pref, fonte_preferida) 
+                    (id, bio, foto_perfil, cor_fundo_pref, cor_texto_pref, tamanho_fonte_pref, fonte_preferida) 
                     VALUES 
                     (?, '', NULL, '#f5f5f5', '#2c3e50', 'medium', 'sans-serif')
                 ";
