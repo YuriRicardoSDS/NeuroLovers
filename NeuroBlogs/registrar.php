@@ -51,9 +51,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST'){
                 // Usa o ID recém-criado para criar a linha do perfil com valores Padrão
                 mysqli_stmt_bind_param($stmt_perfil, "i", $novo_usuario_id);
 
-                // Executa a inserção do perfil. Se falhar, o erro será interno, mas o cadastro do usuário será concluído.
-                mysqli_stmt_execute($stmt_perfil); 
-                mysqli_stmt_close($stmt_perfil);
                 // ----------------------------------------------------------------------
                 // 🎯 FIM DA CORREÇÃO CRÍTICA
                 // ----------------------------------------------------------------------

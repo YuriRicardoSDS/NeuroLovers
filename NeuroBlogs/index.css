@@ -61,15 +61,15 @@ body {
   to { opacity: 1; }
 }
 
-/* Seção principal */
+/* Seção principal (ALTERADO PARA CENTRALIZAÇÃO TOTAL) */
 .hero-full-screen {
   position: relative;
   width: 100%;
   height: 100vh;
   display: flex;
   justify-content: center;
-  /* Alinha o conteúdo no topo do container */
-  align-items: flex-start; 
+  /* >>> ALTERADO: Centraliza verticalmente na tela toda <<< */
+  align-items: center; 
   text-align: center;
   background: none;
   overflow: hidden;
@@ -136,15 +136,13 @@ body {
   100% { opacity: 0.05; filter: brightness(1); }
 }
 
-/* Conteúdo principal (Contém texto/links) */
+/* Conteúdo principal (Contém texto/links) (AJUSTADO) */
 .hero-content {
   z-index: 10;
   max-width: 1000px;
+  /* >>> ALTERADO: Apenas margem auto, removemos o margin-top fixo <<< */
   margin: 0 auto;
   padding: 0 20px;
-  
-  /* Posição no topo */
-  margin-top: 320px; 
   
   /* Transição de entrada ajustada para ser suave */
   transform: translateY(20px);
@@ -241,10 +239,12 @@ body {
   border-color: #f0f0f0;
 }
 
-/* Media Queries (Inalterado) */
+/* Media Queries (Ajustado o margin-top para ser responsivo) */
 @media (max-width: 768px) {
   .hero-content {
-    margin-top: 40px; 
+    /* Ajuste para garantir padding em telas pequenas, já que removemos o margin-top fixo */
+    padding-top: 40px; 
+    padding-bottom: 40px;
   }
   
   .hero-title {

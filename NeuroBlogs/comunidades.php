@@ -1,5 +1,5 @@
 <?php
-// PHP - Arquivo: comunidades.php (Página de Listagem e Gerenciamento de Comunidades)
+// PHP - Arquivo: comunidades.php
 session_start();
 include "conexao.php"; 
 
@@ -11,25 +11,41 @@ if (!isset($_SESSION["usuario_id"])) {
 $userId = $_SESSION['usuario_id'];
 
 // ------------------------------------------------------------------------------------------------
-// 1. LÓGICA DE AÇÃO (ENTRAR/SAIR - AJAX)
+// 1. LÓGICA DE AÇÃO (ENTRAR/SAIR/EXCLUIR - AJAX)
 // ------------------------------------------------------------------------------------------------
 if (isset($_POST['action']) && isset($_POST['community_id'])) {
     $action = $_POST['action'];
     $communityId = intval($_POST['community_id']);
-    $response = ['success' => false];
+    $response = ['success' => false, 'error' => null];
 
     if ($action == 'join') {
-        // Insere o usuário na tabela membros_comunidade
-        $sql = "INSERT IGNORE INTO membros_comunidade (id_comunidade, id_usuario) VALUES (?, ?)";
-        $stmt = mysqli_prepare($conn, $sql);
-        if ($stmt) {
-            mysqli_stmt_bind_param($stmt, "ii", $communityId, $userId);
-            if (mysqli_stmt_execute($stmt)) {
-                $response['success'] = true;
-                $response['status'] = 'joined';
+        // --- Verificação do Limite de Membros (50) ---
+        $maxMembers = 50;
+        $sql_check_count = "SELECT COUNT(*) FROM membros_comunidade WHERE id_comunidade = ?";
+        $stmt_check = mysqli_prepare($conn, $sql_check_count);
+        mysqli_stmt_bind_param($stmt_check, "i", $communityId);
+        mysqli_stmt_execute($stmt_check);
+        mysqli_stmt_bind_result($stmt_check, $currentCount);
+        mysqli_stmt_fetch($stmt_check);
+        mysqli_stmt_close($stmt_check);
+
+        if ($currentCount >= $maxMembers) {
+            $response['success'] = false;
+            $response['error'] = 'A comunidade atingiu o limite máximo de ' . $maxMembers . ' membros.';
+        } else {
+            // Insere o usuário na tabela membros_comunidade
+            $sql = "INSERT IGNORE INTO membros_comunidade (id_comunidade, id_usuario) VALUES (?, ?)";
+            $stmt = mysqli_prepare($conn, $sql);
+            if ($stmt) {
+                mysqli_stmt_bind_param($stmt, "ii", $communityId, $userId);
+                if (mysqli_stmt_execute($stmt)) {
+                    $response['success'] = true;
+                    $response['status'] = 'joined';
+                }
+                mysqli_stmt_close($stmt);
             }
-            mysqli_stmt_close($stmt);
         }
+
     } elseif ($action == 'leave') {
         // Remove o usuário da tabela membros_comunidade
         $sql = "DELETE FROM membros_comunidade WHERE id_comunidade = ? AND id_usuario = ?";
@@ -42,10 +58,39 @@ if (isset($_POST['action']) && isset($_POST['community_id'])) {
             }
             mysqli_stmt_close($stmt);
         }
+    } elseif ($action == 'delete') { // ⭐ Lógica de Exclusão (Mantida)
+        // 1. Verifica se o usuário logado é o criador
+        $sql_check_creator = "SELECT id_criador FROM comunidades WHERE id = ?";
+        $stmt_creator = mysqli_prepare($conn, $sql_check_creator);
+        mysqli_stmt_bind_param($stmt_creator, "i", $communityId);
+        mysqli_stmt_execute($stmt_creator);
+        mysqli_stmt_bind_result($stmt_creator, $creatorId);
+        mysqli_stmt_fetch($stmt_creator);
+        mysqli_stmt_close($stmt_creator);
+
+        if ($creatorId == $userId) {
+            // 2. Exclui a comunidade
+            $sql_delete = "DELETE FROM comunidades WHERE id = ?";
+            $stmt_delete = mysqli_prepare($conn, $sql_delete);
+            if ($stmt_delete) {
+                mysqli_stmt_bind_param($stmt_delete, "i", $communityId);
+                if (mysqli_stmt_execute($stmt_delete)) {
+                    $response['success'] = true;
+                    $response['status'] = 'deleted';
+                } else {
+                    $response['error'] = 'Erro ao excluir a comunidade no banco de dados.';
+                }
+                mysqli_stmt_close($stmt_delete);
+            } else {
+                 $response['error'] = 'Erro de preparação da query de exclusão.';
+            }
+        } else {
+            $response['error'] = 'Você não tem permissão para excluir esta comunidade.';
+        }
     }
     
     // Recalcula a contagem de membros para a resposta AJAX
-    if ($response['success']) {
+    if (($action == 'join' || $action == 'leave') && ($response['success'] || $response['error'])) { 
          $sql_count = "SELECT COUNT(*) FROM membros_comunidade WHERE id_comunidade = ?";
          $stmt_count = mysqli_prepare($conn, $sql_count);
          mysqli_stmt_bind_param($stmt_count, "i", $communityId);
@@ -56,32 +101,77 @@ if (isset($_POST['action']) && isset($_POST['community_id'])) {
          mysqli_stmt_close($stmt_count);
     }
 
-
     header('Content-Type: application/json');
     echo json_encode($response);
     exit;
 }
 
 // ------------------------------------------------------------------------------------------------
-// 2. BUSCA DE COMUNIDADES (TODAS)
+// 2. BUSCA, FILTRO E PAGINAÇÃO (NOVO)
 // ------------------------------------------------------------------------------------------------
 
-// Query para buscar todas as comunidades, a contagem de membros e se o usuário logado é membro
+// Configuração da Paginação
+$limit = 18; // Comunidades por página
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$offset = ($page - 1) * $limit;
+$searchTerm = isset($_GET['search']) ? trim($_GET['search']) : '';
+
+// -- Passo A: Contar o total de registros (para saber quantas páginas existem) --
+$sql_count_query = "SELECT COUNT(*) FROM comunidades c";
+$params_count = [];
+$types_count = "";
+
+if (!empty($searchTerm)) {
+    // Adiciona filtro de busca se houver
+    $sql_count_query .= " WHERE c.nome_comunidade LIKE ?"; 
+    $searchTermWild = "%" . $searchTerm . "%";
+    $params_count[] = $searchTermWild;
+    $types_count .= "s";
+}
+
+$stmt_count_exec = mysqli_prepare($conn, $sql_count_query);
+if (!empty($params_count)) {
+    mysqli_stmt_bind_param($stmt_count_exec, $types_count, ...$params_count);
+}
+mysqli_stmt_execute($stmt_count_exec);
+mysqli_stmt_bind_result($stmt_count_exec, $total_records);
+mysqli_stmt_fetch($stmt_count_exec);
+mysqli_stmt_close($stmt_count_exec);
+
+$total_pages = ceil($total_records / $limit);
+
+// -- Passo B: Buscar os dados com Limite e Offset --
 $sql = "
     SELECT 
         c.id, 
         c.nome_comunidade, 
         c.descricao,
+        c.id_criador, 
         (SELECT COUNT(*) FROM membros_comunidade m WHERE m.id_comunidade = c.id) AS total_membros,
         EXISTS(SELECT 1 FROM membros_comunidade m2 WHERE m2.id_comunidade = c.id AND m2.id_usuario = ?) AS is_member
     FROM 
         comunidades c
-    ORDER BY 
-        c.nome_comunidade ASC
 ";
 
+// Adiciona filtro WHERE se houver busca
+if (!empty($searchTerm)) {
+    $sql .= " WHERE c.nome_comunidade LIKE ? ";
+}
+
+$sql .= " ORDER BY c.nome_comunidade ASC LIMIT ? OFFSET ?";
+
 $stmt = mysqli_prepare($conn, $sql);
-mysqli_stmt_bind_param($stmt, "i", $userId);
+
+// Bind dos parâmetros dinamicamente
+if (!empty($searchTerm)) {
+    // Se tem busca: bind (UserId, SearchTerm, Limit, Offset)
+    $searchTermWild = "%" . $searchTerm . "%";
+    mysqli_stmt_bind_param($stmt, "isii", $userId, $searchTermWild, $limit, $offset);
+} else {
+    // Se não tem busca: bind (UserId, Limit, Offset)
+    mysqli_stmt_bind_param($stmt, "iii", $userId, $limit, $offset);
+}
+
 mysqli_stmt_execute($stmt);
 $result = mysqli_stmt_get_result($stmt);
 
@@ -95,7 +185,9 @@ while ($row = mysqli_fetch_assoc($result)) {
 }
 mysqli_stmt_close($stmt);
 
-// Busca as preferências de acessibilidade
+// ------------------------------------------------------------------------------------------------
+// PREFERÊNCIAS DO USUÁRIO (MANTIDO)
+// ------------------------------------------------------------------------------------------------
 $sql_prefs = "SELECT cor_fundo_pref, cor_texto_pref, tamanho_fonte_pref, fonte_preferida FROM perfil_usuario WHERE id = ?";
 $stmt_prefs = mysqli_prepare($conn, $sql_prefs);
 mysqli_stmt_bind_param($stmt_prefs, "i", $userId);
@@ -139,22 +231,20 @@ $prefs = [
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             border-bottom: 2px solid #ddd;
             padding-bottom: 15px;
+            flex-wrap: wrap; /* Permite quebrar linha em telas menores */
         }
         .header-section h1 {
             color: #1e3c72;
             font-size: 2.5rem;
-            /* 📌 Estilo minimalista para centralizar o título entre os dois links/botões */
             flex-grow: 1;
             text-align: center;
         }
-        /* 📌 NOVO ESTILO: Link de Voltar (Não como botão verde) */
         .btn-back-link {
-            /* Remove o estilo de botão para que pareça um link */
             background-color: transparent !important;
-            color: #2879e4; /* Cor para links */
+            color: #2879e4;
             padding: 10px 0;
             border: none;
             text-decoration: none;
@@ -162,10 +252,8 @@ $prefs = [
             font-weight: 500;
             transition: opacity 0.3s;
         }
-        .btn-back-link:hover {
-            opacity: 0.8;
-            background-color: transparent !important;
-        }
+        .btn-back-link:hover { opacity: 0.8; }
+        
         .btn-create-community {
             background-color: #4CAF50;
             color: white;
@@ -176,9 +264,49 @@ $prefs = [
             font-size: 1rem;
             transition: background-color 0.3s;
         }
-        .btn-create-community:hover {
-            background-color: #388E3C;
+        .btn-create-community:hover { background-color: #388E3C; }
+        
+        /* --- ESTILO DA BARRA DE PESQUISA (NOVO) --- */
+        .search-container {
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: center;
         }
+        .search-form {
+            display: flex;
+            width: 100%;
+            max-width: 600px;
+            gap: 10px;
+        }
+        .search-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        .btn-search {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn-search:hover { background-color: #0056b3; }
+        .btn-clear {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+        }
+        .btn-clear:hover { background-color: #a71d2a; }
+
+        /* --- GRID E CARDS (MANTIDO) --- */
         .community-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -193,10 +321,18 @@ $prefs = [
             flex-direction: column;
             justify-content: space-between;
         }
+        /* Estilo para alinhar título e botão de exclusão */
+        .community-header {
+            display: flex;
+            justify-content: space-between; 
+            align-items: center;
+            margin-bottom: 10px; 
+        }
         .community-title {
             color: #2879e4;
             margin-top: 0;
             font-size: 1.5rem;
+            margin-bottom: 0;
         }
         .community-description {
             color: #666;
@@ -223,26 +359,55 @@ $prefs = [
             text-decoration: none;
             transition: background-color 0.3s;
         }
-        .btn-join {
-            background-color: #28a745; 
+        .btn-join { background-color: #28a745; color: white; }
+        .btn-join:hover { background-color: #1e7e34; }
+        .btn-leave { background-color: #dc3545; color: white; }
+        .btn-leave:hover { background-color: #c82333; }
+        .btn-view { background-color: #007bff; color: white; }
+        .btn-view:hover { background-color: #0056b3; }
+        
+        .btn-delete {
+            background-color: #f44336; 
             color: white;
+            padding: 8px 15px; 
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: background-color 0.3s;
         }
-        .btn-join:hover {
-            background-color: #1e7e34;
+        .btn-delete:hover { background-color: #d32f2f; }
+
+        /* --- ESTILOS PAGINAÇÃO (NOVO) --- */
+        .pagination-container {
+            margin-top: 30px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
         }
-        .btn-leave {
-            background-color: #dc3545; 
-            color: white;
+        .pagination-btn {
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            background-color: white;
+            color: #007bff;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: all 0.3s;
         }
-        .btn-leave:hover {
-            background-color: #c82333;
+        .pagination-btn:hover {
+            background-color: #f0f8ff;
+            border-color: #007bff;
         }
-        .btn-view {
+        .pagination-btn.active {
             background-color: #007bff;
             color: white;
+            border-color: #007bff;
         }
-        .btn-view:hover {
-            background-color: #0056b3;
+        .pagination-btn.disabled {
+            color: #aaa;
+            pointer-events: none;
+            background-color: #f9f9f9;
         }
     </style>
 </head>
@@ -250,7 +415,6 @@ $prefs = [
 
     <div class="main-content-communities">
         <div class="header-section">
-            
             <a href="homePage.php" class="btn-back-link" title="Voltar para o Feed Principal">
                 <i class="fas fa-arrow-left"></i> Voltar
             </a>
@@ -262,25 +426,46 @@ $prefs = [
             </a>
         </div>
 
+        <div class="search-container">
+            <form action="comunidades.php" method="GET" class="search-form">
+                <input type="text" name="search" class="search-input" placeholder="Pesquisar comunidade pelo nome..." value="<?php echo htmlspecialchars($searchTerm); ?>">
+                <button type="submit" class="btn-search"><i class="fas fa-search"></i></button>
+                <?php if (!empty($searchTerm)): ?>
+                    <a href="comunidades.php" class="btn-clear" title="Limpar pesquisa"><i class="fas fa-times"></i></a>
+                <?php endif; ?>
+            </form>
+        </div>
+
         <?php if (count($comunidades) > 0): ?>
             <div class="community-grid">
                 <?php foreach ($comunidades as $comunidade): 
                     $btnClass = $comunidade['is_member'] ? 'btn-leave' : 'btn-join';
                     $btnText = $comunidade['is_member'] ? 'Sair' : 'Entrar';
                     $btnAction = $comunidade['is_member'] ? 'leave' : 'join';
+                    $isCreator = ($comunidade['id_criador'] == $userId); // Verifica se o usuário é o criador
                 ?>
                     <div class="community-card" data-id="<?= $comunidade['id'] ?>">
-                        <div>
+                        
+                        <div class="community-header">
                             <h3 class="community-title"><?= htmlspecialchars($comunidade['nome_comunidade']) ?></h3>
-                            <p class="community-description">
-                                <?= empty($comunidade['descricao']) ? "Nenhuma descrição fornecida." : htmlspecialchars(substr($comunidade['descricao'], 0, 100)) . (strlen($comunidade['descricao']) > 100 ? '...' : '') ?>
-                            </p>
+                            <?php if ($isCreator): ?>
+                                <button class="btn-action-community btn-delete" 
+                                        data-community-id="<?= $comunidade['id'] ?>" 
+                                        data-action="delete"
+                                        title="Excluir Comunidade (Apenas para o criador)">
+                                    <i class="fas fa-trash"></i> Excluir
+                                </button>
+                            <?php endif; ?>
                         </div>
+
+                        <p class="community-description">
+                            <?= empty($comunidade['descricao']) ? "Nenhuma descrição fornecida." : htmlspecialchars(substr($comunidade['descricao'], 0, 100)) . (strlen($comunidade['descricao']) > 100 ? '...' : '') ?>
+                        </p>
                         
                         <div class="community-meta">
                             <span class="member-count">
                                 <i class="fas fa-users"></i> 
-                                <span class="member-count-value"><?= $comunidade['total_membros'] ?></span> membros
+                                <span class="member-count-value"><?= $comunidade['total_membros'] ?></span> / 50 membros
                             </span>
                             <div>
                                 <a href="comunidade.php?id=<?= $comunidade['id'] ?>" class="btn-action-community btn-view">Ver</a>
@@ -294,10 +479,43 @@ $prefs = [
                     </div>
                 <?php endforeach; ?>
             </div>
+
+            <?php if ($total_pages > 1): ?>
+                <div class="pagination-container">
+                    <?php 
+                    // Mantém o termo de busca nos links da paginação
+                    $searchParam = !empty($searchTerm) ? '&search=' . urlencode($searchTerm) : '';
+                    ?>
+
+                    <?php if ($page > 1): ?>
+                        <a href="?page=<?= ($page - 1) . $searchParam ?>" class="pagination-btn">&laquo; Anterior</a>
+                    <?php else: ?>
+                        <span class="pagination-btn disabled">&laquo; Anterior</span>
+                    <?php endif; ?>
+
+                    <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                        <a href="?page=<?= $i . $searchParam ?>" class="pagination-btn <?= ($i == $page) ? 'active' : '' ?>">
+                            <?= $i ?>
+                        </a>
+                    <?php endfor; ?>
+
+                    <?php if ($page < $total_pages): ?>
+                        <a href="?page=<?= ($page + 1) . $searchParam ?>" class="pagination-btn">Próximo &raquo;</a>
+                    <?php else: ?>
+                        <span class="pagination-btn disabled">Próximo &raquo;</span>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
         <?php else: ?>
             <div class="no-communities">
-                <p>Nenhuma comunidade foi encontrada no momento.</p>
-                <p>Que tal ser o primeiro a <a href="criar_comunidade.php">criar uma</a>?</p>
+                <?php if (!empty($searchTerm)): ?>
+                    <p>Nenhuma comunidade encontrada para "<strong><?= htmlspecialchars($searchTerm) ?></strong>".</p>
+                    <p><a href="comunidades.php">Ver todas as comunidades</a></p>
+                <?php else: ?>
+                    <p>Nenhuma comunidade foi encontrada no momento.</p>
+                    <p>Que tal ser o primeiro a <a href="criar_comunidade.php">criar uma</a>?</p>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
     </div>
@@ -305,7 +523,7 @@ $prefs = [
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('.btn-action-community').forEach(button => {
-                // Filtra apenas os botões de Entrar/Sair
+                // Filtra apenas os botões de Entrar/Sair/Excluir
                 if (!button.classList.contains('btn-view')) {
                     button.addEventListener('click', function() {
                         const communityId = this.getAttribute('data-community-id');
@@ -313,6 +531,13 @@ $prefs = [
                         const buttonElement = this;
                         const card = buttonElement.closest('.community-card');
                         const countSpan = card.querySelector('.member-count-value');
+
+                        // Confirmação para a ação de Excluir
+                        if (action === 'delete') {
+                            if (!confirm('Tem certeza que deseja EXCLUIR esta comunidade? Esta ação é irreversível e removerá todos os posts, comentários e membros.')) {
+                                return; 
+                            }
+                        }
 
                         const formData = new FormData();
                         formData.append('action', action);
@@ -324,9 +549,19 @@ $prefs = [
                         })
                         .then(response => response.json())
                         .then(data => {
-                            if (data.success) {
+                            
+                            // Tratamento para a exclusão bem-sucedida
+                            if (data.success && data.status === 'deleted') {
+                                card.remove(); 
+                                alert('Comunidade excluída com sucesso!');
+                                return; 
+                            }
+                            
+                            if (data.new_count !== undefined) {
                                 countSpan.textContent = data.new_count;
-                                
+                            }
+                            
+                            if (data.success) {
                                 // Alterna a ação e o estilo do botão
                                 if (data.status === 'joined') {
                                     buttonElement.textContent = 'Sair';
@@ -340,7 +575,11 @@ $prefs = [
                                     buttonElement.setAttribute('data-action', 'join');
                                 }
                             } else {
-                                alert('Erro ao processar a ação. Tente novamente.');
+                                if (data.error) {
+                                    alert(data.error);
+                                } else {
+                                    alert('Erro ao processar a ação. Tente novamente.');
+                                }
                             }
                         })
                         .catch(error => {
