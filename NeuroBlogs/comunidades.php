@@ -47,16 +47,84 @@ if (isset($_POST['action']) && isset($_POST['community_id'])) {
         }
 
     } elseif ($action == 'leave') {
-        // Remove o usuário da tabela membros_comunidade
-        $sql = "DELETE FROM membros_comunidade WHERE id_comunidade = ? AND id_usuario = ?";
-        $stmt = mysqli_prepare($conn, $sql);
-        if ($stmt) {
-            mysqli_stmt_bind_param($stmt, "ii", $communityId, $userId);
-            if (mysqli_stmt_execute($stmt)) {
-                $response['success'] = true;
-                $response['status'] = 'left';
+        // 1. Verifica se o usuário que está saindo é o DONO (Criador)
+        $sql_check_creator = "SELECT id_criador FROM comunidades WHERE id = ?";
+        $stmt_creator = mysqli_prepare($conn, $sql_check_creator);
+        mysqli_stmt_bind_param($stmt_creator, "i", $communityId);
+        mysqli_stmt_execute($stmt_creator);
+        mysqli_stmt_bind_result($stmt_creator, $currentCreatorId);
+        mysqli_stmt_fetch($stmt_creator);
+        mysqli_stmt_close($stmt_creator);
+
+        // 2. Conta quantos membros existem (incluindo o próprio usuário)
+        $sql_count = "SELECT COUNT(*) FROM membros_comunidade WHERE id_comunidade = ?";
+        $stmt_count = mysqli_prepare($conn, $sql_count);
+        mysqli_stmt_bind_param($stmt_count, "i", $communityId);
+        mysqli_stmt_execute($stmt_count);
+        mysqli_stmt_bind_result($stmt_count, $totalMembers);
+        mysqli_stmt_fetch($stmt_count);
+        mysqli_stmt_close($stmt_count);
+
+        $proceedWithLeave = true;
+        
+        if ($currentCreatorId == $userId) {
+            // O usuário é o dono.
+            
+            if ($totalMembers > 1) {
+                // CASO 1: Há outros membros. Transfere a liderança aleatoriamente.
+                
+                // Busca um membro aleatório que NÃO seja o usuário atual (dono)
+                $sql_heir = "SELECT id_usuario FROM membros_comunidade WHERE id_comunidade = ? AND id_usuario != ? ORDER BY RAND() LIMIT 1";
+                $stmt_heir = mysqli_prepare($conn, $sql_heir);
+                mysqli_stmt_bind_param($stmt_heir, "ii", $communityId, $userId);
+                mysqli_stmt_execute($stmt_heir);
+                mysqli_stmt_bind_result($stmt_heir, $newOwnerId);
+                $foundHeir = mysqli_stmt_fetch($stmt_heir);
+                mysqli_stmt_close($stmt_heir);
+
+                if ($foundHeir && $newOwnerId) {
+                    // Atualiza a tabela comunidades definindo o novo criador
+                    $sql_update_owner = "UPDATE comunidades SET id_criador = ? WHERE id = ?";
+                    $stmt_update = mysqli_prepare($conn, $sql_update_owner);
+                    mysqli_stmt_bind_param($stmt_update, "ii", $newOwnerId, $communityId);
+                    mysqli_stmt_execute($stmt_update);
+                    mysqli_stmt_close($stmt_update);
+                } else {
+                    // Isso não deveria ocorrer se totalMembers > 1, mas bloqueamos por segurança.
+                    $response['error'] = 'Erro interno: Não foi possível encontrar um novo dono para a comunidade.';
+                    $proceedWithLeave = false;
+                }
+
+            } else {
+                // CASO 2: É o único membro (totalMembers == 1). Impede a saída.
+                $response['error'] = 'Você é o único membro e criador desta comunidade. Não é possível sair sem transferir a liderança. Você pode convidar outra pessoa ou usar o botão "Excluir" para encerrá-la.';
+                $proceedWithLeave = false; // Bloqueia a remoção do membro no banco
             }
-            mysqli_stmt_close($stmt);
+
+        } // Fim da verificação de dono
+        
+        // 3. Remove o usuário da tabela membros_comunidade (se $proceedWithLeave for true)
+        if ($proceedWithLeave) {
+            $sql = "DELETE FROM membros_comunidade WHERE id_comunidade = ? AND id_usuario = ?";
+            $stmt = mysqli_prepare($conn, $sql);
+            if ($stmt) {
+                mysqli_stmt_bind_param($stmt, "ii", $communityId, $userId);
+                if (mysqli_stmt_execute($stmt)) {
+                    $response['success'] = true;
+                    $response['status'] = 'left';
+                    
+                    // Adiciona um status extra para o front-end se a liderança foi transferida
+                    if ($currentCreatorId == $userId) {
+                        $response['status'] = 'owner_transferred'; 
+                    }
+                    
+                } else {
+                     $response['error'] = 'Erro ao remover o membro do banco de dados.';
+                }
+                mysqli_stmt_close($stmt);
+            } else {
+                $response['error'] = 'Erro de preparação da query de saída.';
+            }
         }
     } elseif ($action == 'delete') { // ⭐ Lógica de Exclusão (Mantida)
         // 1. Verifica se o usuário logado é o criador
@@ -568,7 +636,7 @@ $prefs = [
                                     buttonElement.classList.remove('btn-join');
                                     buttonElement.classList.add('btn-leave');
                                     buttonElement.setAttribute('data-action', 'leave');
-                                } else if (data.status === 'left') {
+                                } else if (data.status === 'left' || data.status === 'owner_transferred') { // Adiciona a checagem
                                     buttonElement.textContent = 'Entrar';
                                     buttonElement.classList.remove('btn-leave');
                                     buttonElement.classList.add('btn-join');
@@ -576,7 +644,7 @@ $prefs = [
                                 }
                             } else {
                                 if (data.error) {
-                                    alert(data.error);
+                                    alert(data.error); // Vai exibir a mensagem "Você é o único membro e criador desta comunidade..."
                                 } else {
                                     alert('Erro ao processar a ação. Tente novamente.');
                                 }

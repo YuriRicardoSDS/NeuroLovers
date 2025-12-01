@@ -684,7 +684,8 @@ $posts = fetch_community_posts($conn, $comunidadeId, $userId);
                 <p class="text-muted"><?php echo $community['total_membros']; ?> Membros</p>
 
                 <?php if (!$isCreator): ?>
-                    <button class="btn btn-sm <?php echo $isMember ? 'btn-danger' : 'btn-success'; ?>"
+                    <button id="community-action-button" 
+                            class="btn btn-sm <?php echo $isMember ? 'btn-danger' : 'btn-success'; ?>"
                             data-community-id="<?php echo $comunidadeId; ?>"
                             data-action="<?php echo $isMember ? 'leave' : 'join'; ?>">
                         <?php echo $isMember ? 'Sair da Comunidade' : 'Entrar na Comunidade'; ?>
@@ -1140,7 +1141,66 @@ $posts = fetch_community_posts($conn, $comunidadeId, $userId);
                     }
                 });
             }
-        });
+        });// Adicionar DENTRO do document.addEventListener('DOMContentLoaded', function() { ... });
+
+    // ------------------------------------------
+    // 7. LÓGICA DO BOTÃO ENTRAR/SAIR (AJAX)
+    // ------------------------------------------
+       const actionButton = document.getElementById('community-action-button'); 
+            
+            if (actionButton) {
+                actionButton.addEventListener('click', function() {
+                    const communityId = this.getAttribute('data-community-id');
+                    let action = this.getAttribute('data-action');
+                    const buttonElement = this;
+
+                    // A chamada deve ser feita para comunidades.php, que contém a lógica de ENTRAR/SAIR
+                    const formData = new FormData();
+                    formData.append('action', action);
+                    formData.append('community_id', communityId);
+
+                    fetch('comunidades.php', { 
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        
+                        if (data.success) {
+                            // Alterna a ação e o estilo do botão
+                            if (data.status === 'joined') {
+                                buttonElement.textContent = 'Sair da Comunidade';
+                                buttonElement.classList.remove('btn-join', 'btn-success');
+                                buttonElement.classList.add('btn-leave', 'btn-danger');
+                                buttonElement.setAttribute('data-action', 'leave');
+                                window.location.reload(); // Recarrega para mostrar a form de postagem
+                            } 
+                            // Trata status 'left' e 'owner_transferred' (vindo de comunidades.php)
+                            else if (data.status === 'left' || data.status === 'owner_transferred') {
+                                buttonElement.textContent = 'Entrar na Comunidade';
+                                buttonElement.classList.remove('btn-leave', 'btn-danger');
+                                buttonElement.classList.add('btn-join', 'btn-success');
+                                buttonElement.setAttribute('data-action', 'join');
+
+                                if (data.status === 'owner_transferred') {
+                                    alert('Você saiu da comunidade. A propriedade foi transferida para outro membro aleatório.');
+                                }
+                                window.location.reload(); // Recarrega para remover a form de postagem
+                            }
+                        } else {
+                            if (data.error) {
+                                alert(data.error); // Exibe a mensagem de bloqueio se for o único membro
+                            } else {
+                                alert('Erro ao processar a ação. Tente novamente.');
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro de rede/AJAX:', error);
+                        alert('Erro de conexão ao processar a ação.');
+                    });
+                });
+            }
     </script>
 </body>
 </html>
